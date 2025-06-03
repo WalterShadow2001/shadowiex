@@ -502,7 +502,7 @@ $selectFolderButton = Create-StyledButton -text "Examinar..." -x 660 -y 70 -widt
 $tabInstallers.Controls.Add($selectFolderButton)
 
 # Crear botón de instalación para instaladores personalizados
-$installCustomInstallersButton = Create-StyledButton -text "Copiar Instaladores Seleccionados" -x 400 -y 100 -action {
+$installCustomInstallersButton = Create-StyledButton -text "Instalar Seleccionados" -x 400 -y 100 -action {
     $selectedIndices = $installersChecklist.CheckedIndices
     if ($selectedIndices.Count -eq 0) {
         [System.Windows.Forms.MessageBox]::Show("Por favor, seleccione al menos un instalador.", "Sin Selección", [System.Windows.Forms.MessageBoxButtons]::OK, [System.Windows.Forms.MessageBoxIcon]::Warning)
@@ -521,13 +521,27 @@ $installCustomInstallersButton = Create-StyledButton -text "Copiar Instaladores 
     
     foreach ($index in $selectedIndices) {
         $installer = $customInstallers[$index]
-        $destinationPath = Join-Path $downloadPath $installer.FileName
-        Copy-Item -Path $installer.LocalPath -Destination $destinationPath -Force
+        try {
+            # Copiar el archivo al destino
+            $destinationPath = Join-Path $downloadPath $installer.FileName
+            Copy-Item -Path $installer.LocalPath -Destination $destinationPath -Force
+            
+            # Intentar instalar el archivo
+            if ($installer.FileName -like "*Optimizer*.exe") {
+                Start-Process -FilePath $destinationPath -Wait
+            } else {
+                Start-Process -FilePath $destinationPath -ArgumentList "/S", "/quiet", "/norestart" -Wait
+            }
+            
+            [System.Windows.Forms.MessageBox]::Show("Instalación de $($installer.Name) completada.", "Éxito", [System.Windows.Forms.MessageBoxButtons]::OK, [System.Windows.Forms.MessageBoxIcon]::Information)
+        } catch {
+            [System.Windows.Forms.MessageBox]::Show("Error al instalar $($installer.Name): $_", "Error", [System.Windows.Forms.MessageBoxButtons]::OK, [System.Windows.Forms.MessageBoxIcon]::Error)
+        }
         $installersProgressBar.Value += 1
     }
     
     $installersProgressBar.Visible = $false
-    [System.Windows.Forms.MessageBox]::Show("Copia de los instaladores seleccionados completada.", "Copia Completa", [System.Windows.Forms.MessageBoxButtons]::OK, [System.Windows.Forms.MessageBoxIcon]::Information)
+    [System.Windows.Forms.MessageBox]::Show("Proceso de instalación completado.", "Instalación Completa", [System.Windows.Forms.MessageBoxButtons]::OK, [System.Windows.Forms.MessageBoxIcon]::Information)
 }
 $tabInstallers.Controls.Add($installCustomInstallersButton)
 
