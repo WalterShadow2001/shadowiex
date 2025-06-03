@@ -460,13 +460,14 @@ $installersChecklist.Location = New-Object System.Drawing.Point(20, 50)
 $installersChecklist.Size = New-Object System.Drawing.Size(350, 400)
 $installersChecklist.CheckOnClick = $true
 
-# Definir instaladores personalizados con URLs y nombres de archivo
-# Esto se poblaría desde su repositorio de GitHub
-$customInstallers = @(
-    @{URL = "https://example.com/installer1.exe"; FileName = "installer1.exe"; Name = "Ejemplo Instalador 1"},
-    @{URL = "https://example.com/installer2.exe"; FileName = "installer2.exe"; Name = "Ejemplo Instalador 2"}
-    # Añadir más instaladores según sea necesario
-)
+# Definir instaladores personalizados desde la carpeta local del repositorio
+$customInstallers = Get-ChildItem -Path "$PSScriptRoot\instaladores" -Filter "*.exe" | ForEach-Object {
+    @{
+        FileName = $_.Name
+        Name = $_.Name
+        LocalPath = $_.FullName
+    }
+}
 
 # Añadir instaladores a la lista de verificación
 foreach ($installer in $customInstallers) {
@@ -500,7 +501,7 @@ $selectFolderButton = Create-StyledButton -text "Examinar..." -x 660 -y 70 -widt
 $tabInstallers.Controls.Add($selectFolderButton)
 
 # Crear botón de instalación para instaladores personalizados
-$installCustomInstallersButton = Create-StyledButton -text "Descargar e Instalar Seleccionados" -x 400 -y 100 -action {
+$installCustomInstallersButton = Create-StyledButton -text "Copiar Instaladores Seleccionados" -x 400 -y 100 -action {
     $selectedIndices = $installersChecklist.CheckedIndices
     if ($selectedIndices.Count -eq 0) {
         [System.Windows.Forms.MessageBox]::Show("Por favor, seleccione al menos un instalador.", "Sin Selección", [System.Windows.Forms.MessageBoxButtons]::OK, [System.Windows.Forms.MessageBoxIcon]::Warning)
@@ -509,7 +510,7 @@ $installCustomInstallersButton = Create-StyledButton -text "Descargar e Instalar
     
     $downloadPath = $downloadFolderTextBox.Text
     if (-not (Test-Path $downloadPath)) {
-        [System.Windows.Forms.MessageBox]::Show("La carpeta de descarga no existe. Por favor, seleccione una carpeta válida.", "Carpeta Inválida", [System.Windows.Forms.MessageBoxButtons]::OK, [System.Windows.Forms.MessageBoxIcon]::Error)
+        [System.Windows.Forms.MessageBox]::Show("La carpeta de destino no existe. Por favor, seleccione una carpeta válida.", "Carpeta Inválida", [System.Windows.Forms.MessageBoxButtons]::OK, [System.Windows.Forms.MessageBoxIcon]::Error)
         return
     }
     
@@ -519,12 +520,13 @@ $installCustomInstallersButton = Create-StyledButton -text "Descargar e Instalar
     
     foreach ($index in $selectedIndices) {
         $installer = $customInstallers[$index]
-        Download-And-Install -url $installer.URL -fileName $installer.FileName -downloadPath $downloadPath
+        $destinationPath = Join-Path $downloadPath $installer.FileName
+        Copy-Item -Path $installer.LocalPath -Destination $destinationPath -Force
         $installersProgressBar.Value += 1
     }
     
     $installersProgressBar.Visible = $false
-    [System.Windows.Forms.MessageBox]::Show("Descarga e instalación de los instaladores seleccionados completada.", "Instalación Completa", [System.Windows.Forms.MessageBoxButtons]::OK, [System.Windows.Forms.MessageBoxIcon]::Information)
+    [System.Windows.Forms.MessageBox]::Show("Copia de los instaladores seleccionados completada.", "Copia Completa", [System.Windows.Forms.MessageBoxButtons]::OK, [System.Windows.Forms.MessageBoxIcon]::Information)
 }
 $tabInstallers.Controls.Add($installCustomInstallersButton)
 
