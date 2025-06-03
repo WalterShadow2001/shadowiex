@@ -461,7 +461,8 @@ $installersChecklist.Size = New-Object System.Drawing.Size(350, 400)
 $installersChecklist.CheckOnClick = $true
 
 # Definir instaladores personalizados desde la carpeta local del repositorio
-$customInstallers = Get-ChildItem -Path "$PSScriptRoot\instaladores" -Filter "*.exe" | ForEach-Object {
+$instaladoresPath = Join-Path -Path $PSScriptRoot -ChildPath "instaladores"
+$customInstallers = Get-ChildItem -Path $instaladoresPath -Filter "*.exe" | ForEach-Object {
     @{
         FileName = $_.Name
         Name = $_.Name
