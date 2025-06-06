@@ -230,40 +230,21 @@ function Optimize-System {
     Write-Host "Sistema optimizado correctamente."
 }
 
-# Función para activar Windows y Office usando scripts MAS
-function Activate-Windows-Office {
-    try {
-        $masPath = Join-Path $PSScriptRoot "Microsoft-Activation-Scripts-master\MAS\All-In-One-Version-KL"
-        $scriptPath = Join-Path $masPath "MAS_AIO.cmd"
-        
-        if (-not (Test-Path $masPath)) {
-            # Si no existe la carpeta, descargar el script desde el repositorio oficial
-            $downloadUrl = "https://github.com/massgravel/Microsoft-Activation-Scripts/archive/master.zip"
-            $zipPath = Join-Path $env:TEMP "MAS.zip"
-            
-            Write-Host "Descargando MAS..." -ForegroundColor Yellow
-            Invoke-WebRequest -Uri $downloadUrl -OutFile $zipPath
-            
-            Write-Host "Extrayendo archivos..." -ForegroundColor Yellow
-            Expand-Archive -Path $zipPath -DestinationPath $PSScriptRoot -Force
-            Remove-Item $zipPath -Force
-        }
-
-        if (Test-Path $scriptPath) {
-            Write-Host "Ejecutando MAS..." -ForegroundColor Green
-            Start-Process cmd.exe -ArgumentList "/c `"$scriptPath`" /HWID /Ohook /KMS38" -Verb RunAs -Wait
-        } else {
-            throw "No se encuentra el archivo de activación en: $scriptPath"
-        }
-        
-    } catch {
-        [System.Windows.Forms.MessageBox]::Show(
-            "Error durante la activación: $_`nPor favor, ejecute el programa como administrador.",
-            "Error",
-            [System.Windows.Forms.MessageBoxButtons]::OK,
-            [System.Windows.Forms.MessageBoxImage]::Error
-        )
+# Función para activar Windows y Office
+function Activate-WindowsAndOffice {
+    $masScriptsPath = Join-Path $PSScriptRoot "Microsoft-Activation-Scripts-master\MAS\All-In-One-Version"
+    $masScript = Join-Path $masScriptsPath "MAS_AIO.cmd"
+    
+    if (-not (Test-Path $masScript)) {
+        # Descargar y extraer MAS si no existe
+        $masUrl = "https://github.com/massgravel/Microsoft-Activation-Scripts/archive/refs/heads/master.zip"
+        $masZip = Join-Path $env:TEMP "MAS.zip"
+        Invoke-WebRequest -Uri $masUrl -OutFile $masZip
+        Expand-Archive -Path $masZip -DestinationPath $PSScriptRoot -Force
     }
+    
+    # Ejecutar activación
+    Start-Process -FilePath $masScript -Wait -NoNewWindow
 }
 
 # Función para ejecutar script de activación desde activated.win
@@ -289,6 +270,66 @@ function Run-ChrisTitusScript {
 }
 
 
+
+# Función para descargar los instaladores desde GitHub
+function Download-InstallersFromGitHub {
+    param (
+        [string]$repoOwner,
+        [string]$repoName,
+        [string]$branch = "main"
+    )
+    
+    try {
+        # Crear la carpeta instaladores si no existe
+        $scriptPath = Split-Path -Parent $MyInvocation.MyCommand.Path
+        $instaladoresPath = Join-Path -Path $scriptPath -ChildPath "instaladores"
+        if (-not (Test-Path $instaladoresPath)) {
+            New-Item -ItemType Directory -Path $instaladoresPath -Force | Out-Null
+        }
+        
+        # URL base para la API de GitHub
+        $apiUrl = "https://api.github.com/repos/$repoOwner/$repoName/contents/instaladores?ref=$branch"
+        
+        # Obtener la lista de archivos
+        $response = Invoke-RestMethod -Uri $apiUrl -Headers @{
+            "Accept" = "application/vnd.github.v3+json"
+        }
+        
+        foreach ($file in $response) {
+            if ($file.name -like "*.exe") {
+                $downloadUrl = $file.download_url
+                $localPath = Join-Path $instaladoresPath $file.name
+                
+                Write-Host "Descargando $($file.name)..."
+                Invoke-WebRequest -Uri $downloadUrl -OutFile $localPath
+            }
+        }
+        
+        return $true
+    } catch {
+        Write-Host "Error al descargar instaladores: $_"
+        return $false
+    }
+}
+
+# Modificar la sección de inicialización de instaladores
+$scriptPath = Split-Path -Parent $MyInvocation.MyCommand.Path
+$instaladoresPath = Join-Path -Path $scriptPath -ChildPath "instaladores"
+
+# Intentar descargar los instaladores si la carpeta está vacía
+if (-not (Test-Path $instaladoresPath) -or -not (Get-ChildItem -Path $instaladoresPath -Filter "*.exe")) {
+    Write-Host "Descargando instaladores desde GitHub..."
+    Download-InstallersFromGitHub -repoOwner "TuUsuarioDeGitHub" -repoName "Shadowiex"
+}
+
+# Obtener la lista de instaladores
+$customInstallers = Get-ChildItem -Path $instaladoresPath -Filter "*.exe" -ErrorAction SilentlyContinue | ForEach-Object {
+    @{
+        FileName = $_.Name
+        Name = $_.Name
+        LocalPath = $_.FullName
+    }
+}
 
 # Definir categorías de software y sus aplicaciones
 $softwareCategories = @{
@@ -560,11 +601,10 @@ $activationsLabel.Size = New-Object System.Drawing.Size(300, 20)
 $tabActivations.Controls.Add($activationsLabel)
 
 # Crear botones de activación
-$activateWindowsOfficeButton = Create-StyledButton -text "Activar Windows y Office (MAS)" -x 20 -y 50 -action {
-    Activate-Windows-Office
-    [System.Windows.Forms.MessageBox]::Show("Activación de Windows y Office completada.", "Activación", [System.Windows.Forms.MessageBoxButtons]::OK, [System.Windows.Forms.MessageBoxIcon]::Information)
+$activateButton = Create-StyledButton -text "Activar Windows y Office" -x 50 -y 50 -width 200 -height 40 -action {
+    Activate-WindowsAndOffice
 }
-$tabActivations.Controls.Add($activateWindowsOfficeButton)
+$tabActivations.Controls.Add($activateButton)
 
 $activatedWinButton = Create-StyledButton -text "Ejecutar Script Activated.Win" -x 20 -y 100 -action {
     Run-ActivatedWin
