@@ -232,19 +232,43 @@ function Optimize-System {
 
 # Función para activar Windows y Office
 function Activate-WindowsAndOffice {
-    $masScriptsPath = Join-Path $PSScriptRoot "Microsoft-Activation-Scripts-master\MAS\All-In-One-Version"
-    $masScript = Join-Path $masScriptsPath "MAS_AIO.cmd"
+    $masPath = Join-Path -Path $PSScriptRoot -ChildPath "Microsoft-Activation-Scripts-master"
+    $masAIOPath = Join-Path -Path $masPath -ChildPath "MAS\All-In-One-Version"
+    $masScript = Join-Path -Path $masAIOPath -ChildPath "MAS_AIO.cmd"
     
-    if (-not (Test-Path $masScript)) {
-        # Descargar y extraer MAS si no existe
+    # Verificar si el script existe
+    if (-not (Test-Path -Path $masScript)) {
+        Write-Host "Descargando scripts de activación..."
         $masUrl = "https://github.com/massgravel/Microsoft-Activation-Scripts/archive/refs/heads/master.zip"
-        $masZip = Join-Path $env:TEMP "MAS.zip"
-        Invoke-WebRequest -Uri $masUrl -OutFile $masZip
-        Expand-Archive -Path $masZip -DestinationPath $PSScriptRoot -Force
+        $masZip = Join-Path -Path $env:TEMP -ChildPath "MAS.zip"
+        
+        try {
+            # Descargar y extraer el archivo
+            Invoke-WebRequest -Uri $masUrl -OutFile $masZip
+            Expand-Archive -Path $masZip -DestinationPath $PSScriptRoot -Force
+            Remove-Item -Path $masZip -Force
+            
+            # Verificar si se creó el archivo después de la extracción
+            if (-not (Test-Path -Path $masScript)) {
+                Write-Host "Error: No se pudo encontrar el script después de la extracción."
+                return
+            }
+        } catch {
+            Write-Host "Error al descargar o extraer los scripts: $_"
+            return
+        }
     }
     
-    # Ejecutar activación
-    Start-Process -FilePath $masScript -Wait -NoNewWindow
+    # Ejecutar el script solo si existe
+    if (Test-Path -Path $masScript) {
+        try {
+            Start-Process -FilePath $masScript -Wait -NoNewWindow
+        } catch {
+            Write-Host "Error al ejecutar el script de activación: $_"
+        }
+    } else {
+        Write-Host "No se encontró el script de activación."
+    }
 }
 
 # Función para ejecutar script de activación desde activated.win
@@ -271,63 +295,23 @@ function Run-ChrisTitusScript {
 
 
 
-# Función para descargar los instaladores desde GitHub
-function Download-InstallersFromGitHub {
-    param (
-        [string]$repoOwner,
-        [string]$repoName,
-        [string]$branch = "main"
-    )
+# Función para gestionar los instaladores
+function Initialize-Installers {
+    $instaladoresPath = Join-Path -Path $PSScriptRoot -ChildPath "instaladores"
     
-    try {
-        # Crear la carpeta instaladores si no existe
-        $scriptPath = Split-Path -Parent $MyInvocation.MyCommand.Path
-        $instaladoresPath = Join-Path -Path $scriptPath -ChildPath "instaladores"
-        if (-not (Test-Path $instaladoresPath)) {
-            New-Item -ItemType Directory -Path $instaladoresPath -Force | Out-Null
-        }
-        
-        # URL base para la API de GitHub
-        $apiUrl = "https://api.github.com/repos/$repoOwner/$repoName/contents/instaladores?ref=$branch"
-        
-        # Obtener la lista de archivos
-        $response = Invoke-RestMethod -Uri $apiUrl -Headers @{
-            "Accept" = "application/vnd.github.v3+json"
-        }
-        
-        foreach ($file in $response) {
-            if ($file.name -like "*.exe") {
-                $downloadUrl = $file.download_url
-                $localPath = Join-Path $instaladoresPath $file.name
-                
-                Write-Host "Descargando $($file.name)..."
-                Invoke-WebRequest -Uri $downloadUrl -OutFile $localPath
-            }
-        }
-        
-        return $true
-    } catch {
-        Write-Host "Error al descargar instaladores: $_"
-        return $false
+    # Crear directorio si no existe
+    if (-not (Test-Path -Path $instaladoresPath)) {
+        New-Item -ItemType Directory -Path $instaladoresPath -Force | Out-Null
     }
-}
-
-# Modificar la sección de inicialización de instaladores
-$scriptPath = Split-Path -Parent $MyInvocation.MyCommand.Path
-$instaladoresPath = Join-Path -Path $scriptPath -ChildPath "instaladores"
-
-# Intentar descargar los instaladores si la carpeta está vacía
-if (-not (Test-Path $instaladoresPath) -or -not (Get-ChildItem -Path $instaladoresPath -Filter "*.exe")) {
-    Write-Host "Descargando instaladores desde GitHub..."
-    Download-InstallersFromGitHub -repoOwner "TuUsuarioDeGitHub" -repoName "Shadowiex"
-}
-
-# Obtener la lista de instaladores
-$customInstallers = Get-ChildItem -Path $instaladoresPath -Filter "*.exe" -ErrorAction SilentlyContinue | ForEach-Object {
-    @{
-        FileName = $_.Name
-        Name = $_.Name
-        LocalPath = $_.FullName
+    
+    # Verificar si hay instaladores
+    $instaladores = Get-ChildItem -Path $instaladoresPath -Filter "*.exe" -ErrorAction SilentlyContinue
+    
+    if (-not $instaladores) {
+        Write-Host "No se encontraron instaladores en la carpeta."
+    } else {
+        Write-Host "Instaladores encontrados: $($instaladores.Count)"
+        return $instaladores
     }
 }
 
@@ -488,35 +472,23 @@ $progressBar.Size = New-Object System.Drawing.Size(200, 20)
 $progressBar.Visible = $false
 $tabBasicSoftware.Controls.Add($progressBar)
 
-# Poblar pestaña de Instaladores
-$installersLabel = New-Object System.Windows.Forms.Label
-$installersLabel.Text = "Seleccione instaladores personalizados para descargar e instalar:"
-$installersLabel.Location = New-Object System.Drawing.Point(20, 20)
-$installersLabel.Size = New-Object System.Drawing.Size(350, 20)
-$tabInstallers.Controls.Add($installersLabel)
+# Modificar la inicialización de la pestaña de instaladores
+$installersList = New-Object System.Windows.Forms.CheckedListBox
+$installersList.Location = New-Object System.Drawing.Point(20, 50)
+$installersList.Size = New-Object System.Drawing.Size(500, 300)
+$tabInstallers.Controls.Add($installersList)
 
-# Crear lista de verificación para instaladores personalizados
-$installersChecklist = New-Object System.Windows.Forms.CheckedListBox
-$installersChecklist.Location = New-Object System.Drawing.Point(20, 50)
-$installersChecklist.Size = New-Object System.Drawing.Size(350, 400)
-$installersChecklist.CheckOnClick = $true
-
-# Definir instaladores personalizados desde la carpeta local del repositorio
-$instaladoresPath = Join-Path -Path $PSScriptRoot -ChildPath "instaladores"
-$customInstallers = Get-ChildItem -Path $instaladoresPath -Filter "*.exe" | ForEach-Object {
-    @{
-        FileName = $_.Name
-        Name = $_.Name
-        LocalPath = $_.FullName
+# Botón para refrescar la lista de instaladores
+$refreshButton = Create-StyledButton -text "Actualizar Lista" -x 550 -y 50 -width 150 -height 30 -action {
+    $instaladores = Initialize-Installers
+    if ($instaladores) {
+        $installersList.Items.Clear()
+        foreach ($instalador in $instaladores) {
+            $installersList.Items.Add($instalador.Name)
+        }
     }
 }
-
-# Añadir instaladores a la lista de verificación
-foreach ($installer in $customInstallers) {
-    $installersChecklist.Items.Add($installer.Name, $false)
-}
-
-$tabInstallers.Controls.Add($installersChecklist)
+$tabInstallers.Controls.Add($refreshButton)
 
 # Crear botón para seleccionar carpeta de descarga
 $downloadFolderLabel = New-Object System.Windows.Forms.Label
