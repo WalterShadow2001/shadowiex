@@ -232,21 +232,53 @@ function Optimize-System {
 
 # Función para activar Windows y Office
 function Activate-WindowsAndOffice {
-    $masPath = Join-Path -Path $PSScriptRoot -ChildPath "Microsoft-Activation-Scripts-master"
-    $masAIOPath = Join-Path -Path $masPath -ChildPath "MAS\All-In-One-Version"
+    # Obtener la ruta base del script de manera confiable
+    $scriptRoot = if ($PSScriptRoot) { $PSScriptRoot } else { $PWD.Path }
+    
+    # Definir rutas para los scripts de activación
+    $masPath = Join-Path -Path $scriptRoot -ChildPath "Microsoft-Activation-Scripts-master"
+    $masAIOPath = Join-Path -Path $masPath -ChildPath "MAS\All-In-One-Version-KL"
     $masScript = Join-Path -Path $masAIOPath -ChildPath "MAS_AIO.cmd"
     
     # Verificar si el script existe
     if (-not (Test-Path -Path $masScript)) {
         Write-Host "Descargando scripts de activación..."
-        $masUrl = "https://github.com/massgravel/Microsoft-Activation-Scripts/archive/refs/heads/master.zip"
-        $masZip = Join-Path -Path $env:TEMP -ChildPath "MAS.zip"
+        $masUrl = "https://github.com/WalterShadow2001/shadowiex/archive/refs/heads/main.zip"
+        $masZip = Join-Path -Path $env:TEMP -ChildPath "shadowiex-main.zip"
+        $extractPath = Join-Path -Path $env:TEMP -ChildPath "shadowiex-extract"
         
         try {
+            # Crear directorio de destino si no existe
+            if (-not (Test-Path -Path $masPath)) {
+                New-Item -ItemType Directory -Path $masPath -Force | Out-Null
+            }
+            
             # Descargar y extraer el archivo
             Invoke-WebRequest -Uri $masUrl -OutFile $masZip
-            Expand-Archive -Path $masZip -DestinationPath $PSScriptRoot -Force
+            
+            # Limpiar directorio de extracción temporal si existe
+            if (Test-Path -Path $extractPath) {
+                Remove-Item -Path $extractPath -Recurse -Force
+            }
+            
+            # Extraer el archivo
+            Expand-Archive -Path $masZip -DestinationPath $extractPath -Force
+            
+            # Copiar los archivos de activación al directorio correcto
+            $sourceDir = Join-Path -Path $extractPath -ChildPath "shadowiex-main\Microsoft-Activation-Scripts-master"
+            if (Test-Path -Path $sourceDir) {
+                Copy-Item -Path $sourceDir -Destination $scriptRoot -Recurse -Force
+            } else {
+                Write-Host "Error: No se encontró el directorio de scripts de activación en el archivo descargado."
+            }
+            
+            # Limpiar archivos temporales
             Remove-Item -Path $masZip -Force
+            Remove-Item -Path $extractPath -Recurse -Force
+            
+            # Actualizar la ruta al script después de la extracción
+            $masAIOPath = Join-Path -Path $masPath -ChildPath "MAS\All-In-One-Version-KL"
+            $masScript = Join-Path -Path $masAIOPath -ChildPath "MAS_AIO.cmd"
             
             # Verificar si se creó el archivo después de la extracción
             if (-not (Test-Path -Path $masScript)) {
@@ -259,15 +291,17 @@ function Activate-WindowsAndOffice {
         }
     }
     
-    # Ejecutar el script solo si existe
-    if (Test-Path -Path $masScript) {
-        try {
+    # Ejecutar el script de activación
+    try {
+        Write-Host "Ejecutando script de activación..."
+        if (Test-Path -Path $masScript) {
             Start-Process -FilePath $masScript -Wait -NoNewWindow
-        } catch {
-            Write-Host "Error al ejecutar el script de activación: $_"
+            Write-Host "Activación completada."
+        } else {
+            Write-Host "Error: No se encontró el script de activación en la ruta: $masScript"
         }
-    } else {
-        Write-Host "No se encontró el script de activación."
+    } catch {
+        Write-Host "Error al ejecutar el script de activación: $_"
     }
 }
 
@@ -296,22 +330,92 @@ function Run-ChrisTitusScript {
 
 
 # Función para gestionar los instaladores
+# Función para gestionar los instaladores
 function Initialize-Installers {
-    $instaladoresPath = Join-Path -Path $PSScriptRoot -ChildPath "instaladores"
+    # Obtener la ruta base del script de manera confiable
+    $scriptRoot = if ($PSScriptRoot) { $PSScriptRoot } else { $PWD.Path }
+    
+    $instaladoresPath = Join-Path -Path $scriptRoot -ChildPath "instaladores"
     
     # Crear directorio si no existe
     if (-not (Test-Path -Path $instaladoresPath)) {
+        Write-Host "Creando directorio de instaladores..."
         New-Item -ItemType Directory -Path $instaladoresPath -Force | Out-Null
     }
     
     # Verificar si hay instaladores
     $instaladores = Get-ChildItem -Path $instaladoresPath -Filter "*.exe" -ErrorAction SilentlyContinue
     
-    if (-not $instaladores) {
-        Write-Host "No se encontraron instaladores en la carpeta."
+    if (-not $instaladores -or $instaladores.Count -eq 0) {
+        Write-Host "No se encontraron instaladores en la carpeta $instaladoresPath."
+        
+        # Opcionalmente, descargar instaladores desde GitHub
+        $descargarInstaladores = $true
+        if ($descargarInstaladores) {
+            Write-Host "Descargando instaladores desde GitHub..."
+            Download-InstallersFromGitHub -destinationPath $instaladoresPath
+            
+            # Verificar nuevamente después de la descarga
+            $instaladores = Get-ChildItem -Path $instaladoresPath -Filter "*.exe" -ErrorAction SilentlyContinue
+        }
+    }
+    
+    if (-not $instaladores -or $instaladores.Count -eq 0) {
+        Write-Host "No se encontraron instaladores en la carpeta después de intentar descargarlos."
+        return $null
     } else {
         Write-Host "Instaladores encontrados: $($instaladores.Count)"
         return $instaladores
+    }
+}
+
+# Función para descargar instaladores desde GitHub
+function Download-InstallersFromGitHub {
+    param (
+        [string]$destinationPath
+    )
+    
+    try {
+        # Verificar y crear el directorio de destino si no existe
+        if (-not (Test-Path -Path $destinationPath)) {
+            New-Item -ItemType Directory -Path $destinationPath -Force | Out-Null
+        }
+        
+        # URL del repositorio de GitHub con los instaladores
+        $repoUrl = "https://github.com/WalterShadow2001/shadowiex/archive/refs/heads/main.zip"
+        $tempZip = Join-Path -Path $env:TEMP -ChildPath "shadowiex-instaladores.zip"
+        $extractPath = Join-Path -Path $env:TEMP -ChildPath "shadowiex-extract"
+        
+        # Descargar el archivo ZIP del repositorio
+        Invoke-WebRequest -Uri $repoUrl -OutFile $tempZip
+        
+        # Limpiar directorio de extracción temporal si existe
+        if (Test-Path -Path $extractPath) {
+            Remove-Item -Path $extractPath -Recurse -Force
+        }
+        
+        # Extraer el archivo
+        Expand-Archive -Path $tempZip -DestinationPath $extractPath -Force
+        
+        # Copiar los instaladores al directorio de destino
+        $sourceDir = Join-Path -Path $extractPath -ChildPath "shadowiex-main\instaladores"
+        if (Test-Path -Path $sourceDir) {
+            $instaladores = Get-ChildItem -Path $sourceDir -Filter "*.exe" -ErrorAction SilentlyContinue
+            foreach ($instalador in $instaladores) {
+                Copy-Item -Path $instalador.FullName -Destination $destinationPath -Force
+                Write-Host "Copiado: $($instalador.Name)"
+            }
+        } else {
+            Write-Host "Error: No se encontró el directorio de instaladores en el archivo descargado."
+        }
+        
+        # Limpiar archivos temporales
+        Remove-Item -Path $tempZip -Force
+        Remove-Item -Path $extractPath -Recurse -Force
+        
+        Write-Host "Descarga de instaladores completada."
+    } catch {
+        Write-Host "Error al descargar instaladores desde GitHub: $_"
     }
 }
 
