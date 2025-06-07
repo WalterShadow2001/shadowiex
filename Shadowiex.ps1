@@ -236,57 +236,25 @@ function Activate-WindowsAndOffice {
     $scriptRoot = if ($PSScriptRoot) { $PSScriptRoot } else { $PWD.Path }
     
     # Definir rutas para los scripts de activación
-    $masPath = Join-Path -Path $scriptRoot -ChildPath "Microsoft-Activation-Scripts-master"
-    $masAIOPath = Join-Path -Path $masPath -ChildPath "MAS\All-In-One-Version-KL"
-    $masScript = Join-Path -Path $masAIOPath -ChildPath "MAS_AIO.cmd"
+    $tsforgeScript = Join-Path -Path $scriptRoot -ChildPath "TSforge_Activation.cmd"
     
     # Verificar si el script existe
-    if (-not (Test-Path -Path $masScript)) {
-        Write-Host "Descargando scripts de activación..."
-        $masUrl = "https://github.com/WalterShadow2001/shadowiex/archive/refs/heads/main.zip"
-        $masZip = Join-Path -Path $env:TEMP -ChildPath "shadowiex-main.zip"
-        $extractPath = Join-Path -Path $env:TEMP -ChildPath "shadowiex-extract"
+    if (-not (Test-Path -Path $tsforgeScript)) {
+        Write-Host "Descargando script de activación TSforge..."
+        $tsforgeUrl = "https://github.com/WalterShadow2001/shadowiex/raw/main/TSforge_Activation.cmd"
         
         try {
-            # Crear directorio de destino si no existe
-            if (-not (Test-Path -Path $masPath)) {
-                New-Item -ItemType Directory -Path $masPath -Force | Out-Null
-            }
+            # Descargar el script directamente
+            Invoke-WebRequest -Uri $tsforgeUrl -OutFile $tsforgeScript
             
-            # Descargar y extraer el archivo
-            Invoke-WebRequest -Uri $masUrl -OutFile $masZip
-            
-            # Limpiar directorio de extracción temporal si existe
-            if (Test-Path -Path $extractPath) {
-                Remove-Item -Path $extractPath -Recurse -Force
-            }
-            
-            # Extraer el archivo
-            Expand-Archive -Path $masZip -DestinationPath $extractPath -Force
-            
-            # Copiar los archivos de activación al directorio correcto
-            $sourceDir = Join-Path -Path $extractPath -ChildPath "shadowiex-main\Microsoft-Activation-Scripts-master"
-            if (Test-Path -Path $sourceDir) {
-                Copy-Item -Path $sourceDir -Destination $scriptRoot -Recurse -Force
+            if (Test-Path -Path $tsforgeScript) {
+                Write-Host "Script de activación TSforge descargado correctamente."
             } else {
-                Write-Host "Error: No se encontró el directorio de scripts de activación en el archivo descargado."
-            }
-            
-            # Limpiar archivos temporales
-            Remove-Item -Path $masZip -Force
-            Remove-Item -Path $extractPath -Recurse -Force
-            
-            # Actualizar la ruta al script después de la extracción
-            $masAIOPath = Join-Path -Path $masPath -ChildPath "MAS\All-In-One-Version-KL"
-            $masScript = Join-Path -Path $masAIOPath -ChildPath "MAS_AIO.cmd"
-            
-            # Verificar si se creó el archivo después de la extracción
-            if (-not (Test-Path -Path $masScript)) {
-                Write-Host "Error: No se pudo encontrar el script después de la extracción."
+                Write-Host "Error: No se pudo descargar el script de activación."
                 return
             }
         } catch {
-            Write-Host "Error al descargar o extraer los scripts: $_"
+            Write-Host "Error al descargar el script de activación: $_"
             return
         }
     }
@@ -294,11 +262,30 @@ function Activate-WindowsAndOffice {
     # Ejecutar el script de activación
     try {
         Write-Host "Ejecutando script de activación..."
-        if (Test-Path -Path $masScript) {
-            Start-Process -FilePath $masScript -Wait -NoNewWindow
+        if (Test-Path -Path $tsforgeScript) {
+            # Configurar los parámetros para activar Windows y Office
+            $tempBatchFile = Join-Path -Path $env:TEMP -ChildPath "activate_temp.cmd"
+            
+            # Crear un archivo batch temporal que configure las variables y ejecute el script
+            @"
+@echo off
+set _actwin=1
+set _actoff=1
+call "$tsforgeScript"
+"@ | Out-File -FilePath $tempBatchFile -Encoding ASCII
+            
+            # Ejecutar el archivo batch temporal
+            Start-Process -FilePath "cmd.exe" -ArgumentList "/c", """"", $tempBatchFile, """""
+ -Wait -NoNewWindow
+            
+            # Limpiar el archivo temporal
+            if (Test-Path -Path $tempBatchFile) {
+                Remove-Item -Path $tempBatchFile -Force
+            }
+            
             Write-Host "Activación completada."
         } else {
-            Write-Host "Error: No se encontró el script de activación en la ruta: $masScript"
+            Write-Host "Error: No se encontró el script de activación en la ruta: $tsforgeScript"
         }
     } catch {
         Write-Host "Error al ejecutar el script de activación: $_"
@@ -620,7 +607,7 @@ $tabInstallers.Controls.Add($selectFolderButton)
 
 # Crear botón de instalación para instaladores personalizados
 $installCustomInstallersButton = Create-StyledButton -text "Instalar Seleccionados" -x 400 -y 100 -action {
-    $selectedIndices = $installersChecklist.CheckedIndices
+    $selectedIndices = $installersList.CheckedIndices
     if ($selectedIndices.Count -eq 0) {
         [System.Windows.Forms.MessageBox]::Show("Por favor, seleccione al menos un instalador.", "Sin Selección", [System.Windows.Forms.MessageBoxButtons]::OK, [System.Windows.Forms.MessageBoxIcon]::Warning)
         return
@@ -636,23 +623,34 @@ $installCustomInstallersButton = Create-StyledButton -text "Instalar Seleccionad
     $installersProgressBar.Maximum = $selectedIndices.Count
     $installersProgressBar.Visible = $true
     
+    # Obtener la ruta base del script de manera confiable
+    $scriptRoot = if ($PSScriptRoot) { $PSScriptRoot } else { $PWD.Path }
+    $instaladoresPath = Join-Path -Path $scriptRoot -ChildPath "instaladores"
+    $instaladores = Get-ChildItem -Path $instaladoresPath -Filter "*.exe" -ErrorAction SilentlyContinue
+    
     foreach ($index in $selectedIndices) {
-        $installer = $customInstallers[$index]
-        try {
-            # Copiar el archivo al destino
-            $destinationPath = Join-Path $downloadPath $installer.FileName
-            Copy-Item -Path $installer.LocalPath -Destination $destinationPath -Force
-            
-            # Intentar instalar el archivo
-            if ($installer.FileName -like "*Optimizer*.exe") {
-                Start-Process -FilePath $destinationPath -Wait
-            } else {
-                Start-Process -FilePath $destinationPath -ArgumentList "/S", "/quiet", "/norestart" -Wait
+        $installerName = $installersList.Items[$index].ToString()
+        $installer = $instaladores | Where-Object { $_.Name -eq $installerName } | Select-Object -First 1
+        
+        if ($installer) {
+            try {
+                # Copiar el archivo al destino
+                $destinationPath = Join-Path $downloadPath $installer.Name
+                Copy-Item -Path $installer.FullName -Destination $destinationPath -Force
+                
+                # Intentar instalar el archivo
+                if ($installer.Name -like "*Optimizer*.exe") {
+                    Start-Process -FilePath $destinationPath -Wait
+                } else {
+                    Start-Process -FilePath $destinationPath -ArgumentList "/S", "/quiet", "/norestart" -Wait
+                }
+                
+                [System.Windows.Forms.MessageBox]::Show("Instalación de $($installer.Name) completada.", "Éxito", [System.Windows.Forms.MessageBoxButtons]::OK, [System.Windows.Forms.MessageBoxIcon]::Information)
+            } catch {
+                [System.Windows.Forms.MessageBox]::Show("Error al instalar $($installer.Name): $_", "Error", [System.Windows.Forms.MessageBoxButtons]::OK, [System.Windows.Forms.MessageBoxIcon]::Error)
             }
-            
-            [System.Windows.Forms.MessageBox]::Show("Instalación de $($installer.Name) completada.", "Éxito", [System.Windows.Forms.MessageBoxButtons]::OK, [System.Windows.Forms.MessageBoxIcon]::Information)
-        } catch {
-            [System.Windows.Forms.MessageBox]::Show("Error al instalar $($installer.Name): $_", "Error", [System.Windows.Forms.MessageBoxButtons]::OK, [System.Windows.Forms.MessageBoxIcon]::Error)
+        } else {
+            [System.Windows.Forms.MessageBox]::Show("No se pudo encontrar el instalador: $installerName", "Error", [System.Windows.Forms.MessageBoxButtons]::OK, [System.Windows.Forms.MessageBoxIcon]::Error)
         }
         $installersProgressBar.Value += 1
     }
