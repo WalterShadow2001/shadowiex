@@ -275,8 +275,7 @@ call "$tsforgeScript"
 "@ | Out-File -FilePath $tempBatchFile -Encoding ASCII
             
             # Ejecutar el archivo batch temporal
-            Start-Process -FilePath "cmd.exe" -ArgumentList "/c", """"", $tempBatchFile, """""
- -Wait -NoNewWindow
+            Start-Process -FilePath "cmd.exe" -ArgumentList "/c", "$tempBatchFile" -Wait -NoNewWindow
             
             # Limpiar el archivo temporal
             if (Test-Path -Path $tempBatchFile) {
@@ -507,14 +506,25 @@ foreach ($category in $softwareCategories.Keys) {
 $installBasicSoftwareButton = Create-StyledButton -text "Instalar Software Seleccionado" -x 550 -y 50 -action {
     # Verificar si winget está instalado
     if (-not (Check-WingetInstalled)) {
-        $installWinget = [System.Windows.Forms.MessageBox]::Show("Winget no está instalado. ¿Desea instalarlo?", "Winget Requerido", [System.Windows.Forms.MessageBoxButtons]::YesNo)
+        $installWinget = [System.Windows.Forms.MessageBox]::Show("Winget no está instalado. Es necesario para instalar el software seleccionado. ¿Desea instalarlo ahora?", "Winget Requerido", [System.Windows.Forms.MessageBoxButtons]::YesNo, [System.Windows.Forms.MessageBoxIcon]::Question)
         if ($installWinget -eq [System.Windows.Forms.DialogResult]::Yes) {
-            if (-not (Install-Winget)) {
-                [System.Windows.Forms.MessageBox]::Show("Error al instalar winget. Por favor, instálelo manualmente.", "Error", [System.Windows.Forms.MessageBoxButtons]::OK, [System.Windows.Forms.MessageBoxIcon]::Error)
+            Write-Host "Iniciando instalación de Winget..."
+            $progressBar.Value = 0
+            $progressBar.Maximum = 1
+            $progressBar.Visible = $true
+            
+            if (Install-Winget) {
+                Write-Host "Winget instalado correctamente."
+                $progressBar.Value = 1
+                [System.Windows.Forms.MessageBox]::Show("Winget se ha instalado correctamente. Ahora puede instalar el software seleccionado.", "Instalación Completada", [System.Windows.Forms.MessageBoxButtons]::OK, [System.Windows.Forms.MessageBoxIcon]::Information)
+            } else {
+                Write-Host "Error al instalar Winget."
+                [System.Windows.Forms.MessageBox]::Show("No se pudo instalar Winget. Por favor, instálelo manualmente desde la Microsoft Store o visite https://github.com/microsoft/winget-cli/releases", "Error de Instalación", [System.Windows.Forms.MessageBoxButtons]::OK, [System.Windows.Forms.MessageBoxIcon]::Error)
+                $progressBar.Visible = $false
                 return
             }
-        }
-        else {
+        } else {
+            [System.Windows.Forms.MessageBox]::Show("No se puede continuar sin Winget. Por favor, instálelo e intente nuevamente.", "Operación Cancelada", [System.Windows.Forms.MessageBoxButtons]::OK, [System.Windows.Forms.MessageBoxIcon]::Warning)
             return
         }
     }
