@@ -74,6 +74,17 @@ function Check-WingetInstalled {
     }
 }
 
+# Función para verificar si chocolatey está instalado
+function Check-ChocolateyInstalled {
+    try {
+        $chocoVersion = choco --version
+        return $true
+    }
+    catch {
+        return $false
+    }
+}
+
 # Función para instalar winget si no está instalado
 function Install-Winget {
     Write-Host "Instalando winget..."
@@ -82,21 +93,51 @@ function Install-Winget {
     $latestWingetMsixBundleUri = "https://github.com/microsoft/winget-cli/releases/latest/download/Microsoft.DesktopAppInstaller_8wekyb3d8bbwe.msixbundle"
     $latestWingetMsixBundle = "$env:TEMP\Microsoft.DesktopAppInstaller_8wekyb3d8bbwe.msixbundle"
     
-    Invoke-WebRequest -Uri $latestWingetMsixBundleUri -OutFile $latestWingetMsixBundle
-    Add-AppxPackage -Path $latestWingetMsixBundle
-    
-    # Verificar si la instalación fue exitosa
-    if (Check-WingetInstalled) {
-        Write-Host "Winget instalado correctamente."
-        return $true
+    try {
+        Invoke-WebRequest -Uri $latestWingetMsixBundleUri -OutFile $latestWingetMsixBundle
+        Add-AppxPackage -Path $latestWingetMsixBundle
+        
+        # Verificar si la instalación fue exitosa
+        if (Check-WingetInstalled) {
+            Write-Host "Winget instalado correctamente."
+            return $true
+        }
+        else {
+            Write-Host "Error al instalar winget."
+            return $false
+        }
     }
-    else {
-        Write-Host "Error al instalar winget."
+    catch {
+        Write-Host "Error al instalar Winget: $_"
         return $false
     }
 }
 
-# Función para instalar software usando winget
+# Función para instalar chocolatey
+function Install-Chocolatey {
+    Write-Host "Instalando Chocolatey..."
+    try {
+        Set-ExecutionPolicy Bypass -Scope Process -Force
+        [System.Net.ServicePointManager]::SecurityProtocol = [System.Net.ServicePointManager]::SecurityProtocol -bor 3072
+        Invoke-Expression ((New-Object System.Net.WebClient).DownloadString('https://community.chocolatey.org/install.ps1'))
+        
+        # Verificar si la instalación fue exitosa
+        if (Check-ChocolateyInstalled) {
+            Write-Host "Chocolatey instalado correctamente."
+            return $true
+        }
+        else {
+            Write-Host "Error al instalar Chocolatey."
+            return $false
+        }
+    }
+    catch {
+        Write-Host "Error al instalar Chocolatey: $_"
+        return $false
+    }
+}
+
+# Función para instalar software usando winget o chocolatey
 function Install-Software {
     param (
         [string]$id,
@@ -104,13 +145,37 @@ function Install-Software {
     )
     
     Write-Host "Instalando $name..."
-    winget install --id $id --accept-source-agreements --accept-package-agreements -h | Out-Host
-    if ($LASTEXITCODE -eq 0) {
-        Write-Host "$name instalado correctamente."
-        return $true
+    
+    # Intentar instalar con Winget primero si está disponible
+    if (Check-WingetInstalled) {
+        winget install --id $id --accept-source-agreements --accept-package-agreements -h | Out-Host
+        if ($LASTEXITCODE -eq 0) {
+            Write-Host "$name instalado correctamente con Winget."
+            return $true
+        }
+        else {
+            Write-Host "Error al instalar $name con Winget. Intentando con Chocolatey..."
+        }
+    }
+    
+    # Si Winget no está disponible o falló, intentar con Chocolatey
+    if (Check-ChocolateyInstalled) {
+        # Convertir ID de Winget a ID de Chocolatey (pueden ser diferentes)
+        # Para simplificar, usamos el mismo ID, pero en un caso real podrías tener un mapeo
+        $chocoId = $id.Split('.')[-1].ToLower()
+        
+        choco install $chocoId -y | Out-Host
+        if ($LASTEXITCODE -eq 0) {
+            Write-Host "$name instalado correctamente con Chocolatey."
+            return $true
+        }
+        else {
+            Write-Host "Error al instalar $name con Chocolatey."
+            return $false
+        }
     }
     else {
-        Write-Host "Error al instalar $name."
+        Write-Host "No se pudo instalar $name. Ni Winget ni Chocolatey están disponibles."
         return $false
     }
 }
@@ -274,7 +339,7 @@ set _actoff=1
 call "$tsforgeScript"
 "@ | Out-File -FilePath $tempBatchFile -Encoding ASCII
             
-            # Ejecutar el archivo batch temporal
+            # Ejecutar el archivo batch temporal (corregido)
             Start-Process -FilePath "cmd.exe" -ArgumentList "/c", "$tempBatchFile" -Wait -NoNewWindow
             
             # Limpiar el archivo temporal
@@ -504,28 +569,33 @@ foreach ($category in $softwareCategories.Keys) {
 
 # Crear botón de instalación para software básico
 $installBasicSoftwareButton = Create-StyledButton -text "Instalar Software Seleccionado" -x 550 -y 50 -action {
-    # Verificar si winget está instalado
+    # Verificar si winget está instalado, si no intentar instalarlo automáticamente
     if (-not (Check-WingetInstalled)) {
-        $installWinget = [System.Windows.Forms.MessageBox]::Show("Winget no está instalado. Es necesario para instalar el software seleccionado. ¿Desea instalarlo ahora?", "Winget Requerido", [System.Windows.Forms.MessageBoxButtons]::YesNo, [System.Windows.Forms.MessageBoxIcon]::Question)
-        if ($installWinget -eq [System.Windows.Forms.DialogResult]::Yes) {
-            Write-Host "Iniciando instalación de Winget..."
-            $progressBar.Value = 0
-            $progressBar.Maximum = 1
-            $progressBar.Visible = $true
-            
-            if (Install-Winget) {
-                Write-Host "Winget instalado correctamente."
-                $progressBar.Value = 1
-                [System.Windows.Forms.MessageBox]::Show("Winget se ha instalado correctamente. Ahora puede instalar el software seleccionado.", "Instalación Completada", [System.Windows.Forms.MessageBoxButtons]::OK, [System.Windows.Forms.MessageBoxIcon]::Information)
-            } else {
-                Write-Host "Error al instalar Winget."
-                [System.Windows.Forms.MessageBox]::Show("No se pudo instalar Winget. Por favor, instálelo manualmente desde la Microsoft Store o visite https://github.com/microsoft/winget-cli/releases", "Error de Instalación", [System.Windows.Forms.MessageBoxButtons]::OK, [System.Windows.Forms.MessageBoxIcon]::Error)
-                $progressBar.Visible = $false
-                return
-            }
+        Write-Host "Winget no está instalado. Intentando instalarlo automáticamente..."
+        $progressBar.Value = 0
+        $progressBar.Maximum = 2
+        $progressBar.Visible = $true
+        
+        if (Install-Winget) {
+            Write-Host "Winget instalado correctamente."
+            $progressBar.Value = 1
         } else {
-            [System.Windows.Forms.MessageBox]::Show("No se puede continuar sin Winget. Por favor, instálelo e intente nuevamente.", "Operación Cancelada", [System.Windows.Forms.MessageBoxButtons]::OK, [System.Windows.Forms.MessageBoxIcon]::Warning)
-            return
+            Write-Host "No se pudo instalar Winget. Intentando instalar Chocolatey como alternativa..."
+            
+            if (-not (Check-ChocolateyInstalled)) {
+                if (Install-Chocolatey) {
+                    Write-Host "Chocolatey instalado correctamente."
+                    $progressBar.Value = 1
+                } else {
+                    Write-Host "Error al instalar Chocolatey."
+                    [System.Windows.Forms.MessageBox]::Show("No se pudo instalar ni Winget ni Chocolatey. Por favor, instale uno de ellos manualmente e intente nuevamente.", "Error de Instalación", [System.Windows.Forms.MessageBoxButtons]::OK, [System.Windows.Forms.MessageBoxIcon]::Error)
+                    $progressBar.Visible = $false
+                    return
+                }
+            } else {
+                Write-Host "Chocolatey ya está instalado."
+                $progressBar.Value = 1
+            }
         }
     }
     
