@@ -5,7 +5,7 @@
     Una herramienta completa para instalar software, optimizar el sistema y gestionar activaciones de Windows y Office con interfaz profesional.
 .NOTES
     Autor: WalterShadow2001
-    Versión: 3.1 - Professional Edition (Corregido)
+    Versión: 3.2 - Professional Edition (Corregido)
     Requiere: PowerShell 5.1 o superior, privilegios de administrador
 #>
 
