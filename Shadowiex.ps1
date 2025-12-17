@@ -5,7 +5,7 @@
     Una herramienta completa para instalar software, optimizar el sistema y gestionar activaciones de Windows y Office.
 .NOTES
     Autor: WalterShadow2001
-    Versión: 2.0
+    Versión: 2.1
     Requiere: PowerShell 5.1 o superior, privilegios de administrador
 #>
 
@@ -20,27 +20,35 @@ Add-Type -AssemblyName System.Windows.Forms
 Add-Type -AssemblyName System.Drawing
 Add-Type -AssemblyName PresentationFramework
 
-# Crear formulario principal
+# Crear formulario principal con tema oscuro
  $form = New-Object System.Windows.Forms.Form
  $form.Text = "Shadowiex - Herramienta de Configuración y Optimización del Sistema"
  $form.Size = New-Object System.Drawing.Size(900, 650)
  $form.StartPosition = "CenterScreen"
- $form.BackColor = [System.Drawing.Color]::White
+ $form.BackColor = [System.Drawing.Color]::FromArgb(30, 30, 30)  # Fondo oscuro
+ $form.ForeColor = [System.Drawing.Color]::White
  $form.Icon = [System.Drawing.Icon]::ExtractAssociatedIcon("$PSScriptRoot\icon.ico")  # Añadir icono si existe
 
-# Crear control de pestañas
+# Crear control de pestañas con tema oscuro
  $tabControl = New-Object System.Windows.Forms.TabControl
  $tabControl.Dock = [System.Windows.Forms.DockStyle]::Fill
+ $tabControl.BackColor = [System.Drawing.Color]::FromArgb(45, 45, 45)
 
 # Crear pestañas
  $tabBasicSoftware = New-Object System.Windows.Forms.TabPage
  $tabBasicSoftware.Text = "Software Básico"
+ $tabBasicSoftware.BackColor = [System.Drawing.Color]::FromArgb(45, 45, 45)
+ $tabBasicSoftware.ForeColor = [System.Drawing.Color]::White
 
  $tabInstallers = New-Object System.Windows.Forms.TabPage
  $tabInstallers.Text = "Instaladores"
+ $tabInstallers.BackColor = [System.Drawing.Color]::FromArgb(45, 45, 45)
+ $tabInstallers.ForeColor = [System.Drawing.Color]::White
 
  $tabActivations = New-Object System.Windows.Forms.TabPage
  $tabActivations.Text = "Activaciones y Optimizaciones"
+ $tabActivations.BackColor = [System.Drawing.Color]::FromArgb(45, 45, 45)
+ $tabActivations.ForeColor = [System.Drawing.Color]::White
 
 # Añadir pestañas al control de pestañas
  $tabControl.Controls.Add($tabBasicSoftware)
@@ -50,7 +58,7 @@ Add-Type -AssemblyName PresentationFramework
 # Añadir control de pestañas al formulario
  $form.Controls.Add($tabControl)
 
-# Función para crear un botón con estilo
+# Función para crear un botón con estilo profesional
 function Create-StyledButton {
     param (
         [string]$text,
@@ -89,6 +97,7 @@ function Create-StyledLabel {
     $label.Location = New-Object System.Drawing.Point($x, $y)
     $label.Size = New-Object System.Drawing.Size($width, $height)
     $label.Font = New-Object System.Drawing.Font("Segoe UI", 10, [System.Drawing.FontStyle]::Regular)
+    $label.ForeColor = [System.Drawing.Color]::White
     
     return $label
 }
@@ -205,7 +214,7 @@ function Install-Software {
     }
 }
 
-# Función para descargar e instalar instaladores personalizados
+# Función para descargar e instalar instaladores personalizados (corregida)
 function Download-And-Install {
     param (
         [string]$url,
@@ -217,16 +226,24 @@ function Download-And-Install {
     
     try {
         Write-Host "Descargando $fileName..."
-        Invoke-WebRequest -Uri $url -OutFile $filePath
+        Invoke-WebRequest -Uri $url -OutFile $filePath -ErrorAction Stop
         
         Write-Host "Instalando $fileName..."
-        Start-Process -FilePath $filePath -ArgumentList "/S", "/quiet", "/norestart" -Wait
+        # Usar WaitForExit en lugar de -Wait para mejor control
+        $process = Start-Process -FilePath $filePath -ArgumentList "/S", "/quiet", "/norestart" -PassThru
+        $process.WaitForExit()
         
-        Write-Host "$fileName instalado correctamente."
-        return $true
+        if ($process.ExitCode -eq 0) {
+            Write-Host "$fileName instalado correctamente."
+            return $true
+        }
+        else {
+            Write-Host "Error en la instalación de $fileName. Código de salida: $($process.ExitCode)"
+            return $false
+        }
     }
     catch {
-        Write-Host "Error al descargar o instalar $fileName. Error: $_"
+        Write-Host "Error al descargar o instalar $fileName: $_"
         return $false
     }
 }
@@ -316,7 +333,7 @@ function Optimize-System {
     Write-Host "Sistema optimizado correctamente."
 }
 
-# Función para activar Windows y Office
+# Función para activar Windows y Office (corregida)
 function Activate-WindowsAndOffice {
     $scriptRoot = if ($PSScriptRoot) { $PSScriptRoot } else { $PWD.Path }
     $tsforgeScript = Join-Path -Path $scriptRoot -ChildPath "TSforge_Activation.cmd"
@@ -326,7 +343,7 @@ function Activate-WindowsAndOffice {
         $tsforgeUrl = "https://github.com/WalterShadow2001/shadowiex/raw/main/TSforge_Activation.cmd"
         
         try {
-            Invoke-WebRequest -Uri $tsforgeUrl -OutFile $tsforgeScript
+            Invoke-WebRequest -Uri $tsforgeUrl -OutFile $tsforgeScript -ErrorAction Stop
             if (Test-Path -Path $tsforgeScript) {
                 Write-Host "Script de activación TSforge descargado correctamente."
             }
@@ -341,12 +358,11 @@ function Activate-WindowsAndOffice {
         if (Test-Path -Path $tsforgeScript) {
             $tempBatchFile = Join-Path -Path $env:TEMP -ChildPath "activate_temp.cmd"
             
-            @"
-@echo off
-set _actwin=1
-set _actoff=1
-call "$tsforgeScript"
-"@ | Out-File -FilePath $tempBatchFile -Encoding ASCII
+            # Usar Write-Output en lugar de @" para evitar problemas de formato
+            Write-Output "@echo off" | Out-File -FilePath $tempBatchFile -Encoding ASCII
+            Write-Output "set _actwin=1" | Out-File -FilePath $tempBatchFile -Encoding ASCII -Append
+            Write-Output "set _actoff=1" | Out-File -FilePath $tempBatchFile -Encoding ASCII -Append
+            Write-Output "call `"$tsforgeScript`"" | Out-File -FilePath $tempBatchFile -Encoding ASCII -Append
             
             Start-Process -FilePath "cmd.exe" -ArgumentList "/c", "$tempBatchFile" -Wait -NoNewWindow
             Remove-Item -Path $tempBatchFile -Force
@@ -400,7 +416,7 @@ function Initialize-Installers {
     return $instaladores
 }
 
-# Función para descargar instaladores desde GitHub
+# Función para descargar instaladores desde GitHub (corregida)
 function Download-InstallersFromGitHub {
     param (
         [string]$destinationPath
@@ -415,7 +431,7 @@ function Download-InstallersFromGitHub {
         $tempZip = Join-Path -Path $env:TEMP -ChildPath "shadowiex-instaladores.zip"
         $extractPath = Join-Path -Path $env:TEMP -ChildPath "shadowiex-extract"
         
-        Invoke-WebRequest -Uri $repoUrl -OutFile $tempZip
+        Invoke-WebRequest -Uri $repoUrl -OutFile $tempZip -ErrorAction Stop
         
         if (Test-Path -Path $extractPath) {
             Remove-Item -Path $extractPath -Recurse -Force
@@ -492,6 +508,7 @@ function Download-InstallersFromGitHub {
  $scrollPanel.AutoScroll = $true
  $scrollPanel.Location = New-Object System.Drawing.Point(20, 50)
  $scrollPanel.Size = New-Object System.Drawing.Size(800, 450)
+ $scrollPanel.BackColor = [System.Drawing.Color]::FromArgb(45, 45, 45)
  $tabBasicSoftware.Controls.Add($scrollPanel)
 
  $global:allCheckboxes = @()
@@ -510,6 +527,8 @@ foreach ($category in $softwareCategories.Keys) {
         $checkbox.Location = New-Object System.Drawing.Point(30, $yPos)
         $checkbox.Size = New-Object System.Drawing.Size(750, 20)
         $checkbox.Tag = $software.id
+        $checkbox.ForeColor = [System.Drawing.Color]::White
+        $checkbox.BackColor = [System.Drawing.Color]::FromArgb(45, 45, 45)
         $scrollPanel.Controls.Add($checkbox)
         
         $global:allCheckboxes += @{checkbox = $checkbox; id = $software.id; name = $software.name}
@@ -577,6 +596,8 @@ foreach ($category in $softwareCategories.Keys) {
  $installersList = New-Object System.Windows.Forms.CheckedListBox
  $installersList.Location = New-Object System.Drawing.Point(20, 50)
  $installersList.Size = New-Object System.Drawing.Size(800, 300)
+ $installersList.BackColor = [System.Drawing.Color]::FromArgb(45, 45, 45)
+ $installersList.ForeColor = [System.Drawing.Color]::White
  $tabInstallers.Controls.Add($installersList)
 
  $refreshButton = Create-StyledButton -text "Actualizar Lista" -x 20 -y 360 -width 150 -height 30 -action {
@@ -597,6 +618,8 @@ foreach ($category in $softwareCategories.Keys) {
  $downloadFolderTextBox.Location = New-Object System.Drawing.Point(320, 360)
  $downloadFolderTextBox.Size = New-Object System.Drawing.Size(300, 20)
  $downloadFolderTextBox.Text = [Environment]::GetFolderPath("Desktop")
+ $downloadFolderTextBox.BackColor = [System.Drawing.Color]::FromArgb(60, 60, 60)
+ $downloadFolderTextBox.ForeColor = [System.Drawing.Color]::White
  $tabInstallers.Controls.Add($downloadFolderTextBox)
 
  $selectFolderButton = Create-StyledButton -text "Examinar..." -x 630 -y 360 -width 100 -height 20 -action {
@@ -640,13 +663,15 @@ foreach ($category in $softwareCategories.Keys) {
                 $destinationPath = Join-Path $downloadPath $installer.Name
                 Copy-Item -Path $installer.FullName -Destination $destinationPath -Force
                 
-                if ($installer.Name -like "*Optimizer*.exe") {
-                    Start-Process -FilePath $destinationPath -Wait
-                } else {
-                    Start-Process -FilePath $destinationPath -ArgumentList "/S", "/quiet", "/norestart" -Wait
-                }
+                # Usar WaitForExit para mejor control
+                $process = Start-Process -FilePath $destinationPath -ArgumentList "/S", "/quiet", "/norestart" -PassThru
+                $process.WaitForExit()
                 
-                [System.Windows.Forms.MessageBox]::Show("Instalación de $($installer.Name) completada.", "Éxito", [System.Windows.Forms.MessageBoxButtons]::OK, [System.Windows.Forms.MessageBoxIcon]::Information)
+                if ($process.ExitCode -eq 0) {
+                    [System.Windows.Forms.MessageBox]::Show("Instalación de $($installer.Name) completada.", "Éxito", [System.Windows.Forms.MessageBoxButtons]::OK, [System.Windows.Forms.MessageBoxIcon]::Information)
+                } else {
+                    [System.Windows.Forms.MessageBox]::Show("Error al instalar $($installer.Name). Código de salida: $($process.ExitCode)", "Error", [System.Windows.Forms.MessageBoxButtons]::OK, [System.Windows.Forms.MessageBoxIcon]::Error)
+                }
             } catch {
                 [System.Windows.Forms.MessageBox]::Show("Error al instalar $($installer.Name): $_", "Error", [System.Windows.Forms.MessageBoxButtons]::OK, [System.Windows.Forms.MessageBoxIcon]::Error)
             }
