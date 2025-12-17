@@ -5,7 +5,7 @@
     Una herramienta completa para instalar software, optimizar el sistema y gestionar activaciones de Windows y Office.
 .NOTES
     Autor: WalterShadow2001
-    Versión: 2.7
+    Versión: 2.8
     Requiere: PowerShell 5.1 o superior, privilegios de administrador
 #>
 
@@ -245,9 +245,11 @@ function Download-And-Install {
         }
     }
     catch {
-        # CORRECCIÓN: Usar variable simple y concatenación directa
+        # CORRECCIÓN: Usar concatenación simple y variable correctamente nombrada
         $errorMessage = $_.Exception.Message
-        Write-Host "Error al descargar o instalar $fileName: $errorMessage"
+        # Construir el mensaje sin interpolación directa
+        $message = "Error al descargar o instalar " + $fileName + ": " + $errorMessage
+        Write-Host $message
         return $false
     }
 }
@@ -353,7 +355,8 @@ function Activate-WindowsAndOffice {
             }
         } catch {
             $errorMessage = $_.Exception.Message
-            Write-Host "Error al descargar el script de activación: $errorMessage"
+            $message = "Error al descargar el script de activación: " + $errorMessage
+            Write-Host $message
             return
         }
     }
@@ -376,7 +379,8 @@ function Activate-WindowsAndOffice {
         }
     } catch {
         $errorMessage = $_.Exception.Message
-        Write-Host "Error al ejecutar el script de activación: $errorMessage"
+        $message = "Error al ejecutar el script de activación: " + $errorMessage
+        Write-Host $message
     }
 }
 
@@ -388,7 +392,8 @@ function Run-ActivatedWin {
     }
     catch {
         $errorMessage = $_.Exception.Message
-        Write-Host "Error al ejecutar el script de activated.win: $errorMessage"
+        $message = "Error al ejecutar el script de activated.win: " + $errorMessage
+        Write-Host $message
     }
 }
 
@@ -400,7 +405,8 @@ function Run-ChrisTitusScript {
     }
     catch {
         $errorMessage = $_.Exception.Message
-        Write-Host "Error al ejecutar el script de Chris Titus: $errorMessage"
+        $message = "Error al ejecutar el script de Chris Titus: " + $errorMessage
+        Write-Host $message
     }
 }
 
@@ -462,7 +468,8 @@ function Download-InstallersFromGitHub {
         Write-Host "Descarga de instaladores completada."
     } catch {
         $errorMessage = $_.Exception.Message
-        Write-Host "Error al descargar instaladores desde GitHub: $errorMessage"
+        $message = "Error al descargar instaladores desde GitHub: " + $errorMessage
+        Write-Host $message
     }
 }
 
@@ -683,7 +690,8 @@ foreach ($category in $softwareCategories.Keys) {
                 }
             } catch {
                 $errorMessage = $_.Exception.Message
-                [System.Windows.Forms.MessageBox]::Show("Error al instalar $($installer.Name): $errorMessage", "Error", [System.Windows.Forms.MessageBoxButtons]::OK, [System.Windows.Forms.MessageBoxIcon]::Error)
+                $message = "Error al instalar $($installer.Name): " + $errorMessage
+                [System.Windows.Forms.MessageBox]::Show($message, "Error", [System.Windows.Forms.MessageBoxButtons]::OK, [System.Windows.Forms.MessageBoxIcon]::Error)
             }
         } else {
             [System.Windows.Forms.MessageBox]::Show("No se pudo encontrar el instalador: $installerName", "Error", [System.Windows.Forms.MessageBoxButtons]::OK, [System.Windows.Forms.MessageBoxIcon]::Error)
