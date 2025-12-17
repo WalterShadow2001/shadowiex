@@ -5,7 +5,7 @@
     Una herramienta completa para instalar software, optimizar el sistema y gestionar activaciones de Windows y Office.
 .NOTES
     Autor: WalterShadow2001
-    Versión: 2.4
+    Versión: 2.5
     Requiere: PowerShell 5.1 o superior, privilegios de administrador
 #>
 
@@ -146,9 +146,9 @@ function Install-Winget {
         }
     }
     catch {
-        # CORRECCIÓN: Usar variable intermedia para el mensaje de error
+        # CORRECCIÓN: Usar subexpresión para la variable de error
         $errorMessage = $_.Exception.Message
-        Write-Host "Error al instalar Winget: $errorMessage"
+        Write-Host "Error al instalar Winget: $($errorMessage)"
         return $false
     }
 }
@@ -171,9 +171,9 @@ function Install-Chocolatey {
         }
     }
     catch {
-        # CORRECCIÓN: Usar variable intermedia para el mensaje de error
+        # CORRECCIÓN: Usar subexpresión para la variable de error
         $errorMessage = $_.Exception.Message
-        Write-Host "Error al instalar Chocolatey: $errorMessage"
+        Write-Host "Error al instalar Chocolatey: $($errorMessage)"
         return $false
     }
 }
@@ -247,9 +247,9 @@ function Download-And-Install {
         }
     }
     catch {
-        # CORRECCIÓN: Usar variable intermedia para el mensaje de error
+        # CORRECCIÓN: Usar subexpresión para la variable de error
         $errorMessage = $_.Exception.Message
-        Write-Host "Error al descargar o instalar $fileName: $errorMessage"
+        Write-Host "Error al descargar o instalar $fileName: $($errorMessage)"
         return $false
     }
 }
@@ -354,9 +354,9 @@ function Activate-WindowsAndOffice {
                 Write-Host "Script de activación TSforge descargado correctamente."
             }
         } catch {
-            # CORRECCIÓN: Usar variable intermedia para el mensaje de error
+            # CORRECCIÓN: Usar subexpresión para la variable de error
             $errorMessage = $_.Exception.Message
-            Write-Host "Error al descargar el script de activación: $errorMessage"
+            Write-Host "Error al descargar el script de activación: $($errorMessage)"
             return
         }
     }
@@ -378,9 +378,9 @@ function Activate-WindowsAndOffice {
             Write-Host "Activación completada."
         }
     } catch {
-        # CORRECCIÓN: Usar variable intermedia para el mensaje de error
+        # CORRECCIÓN: Usar subexpresión para la variable de error
         $errorMessage = $_.Exception.Message
-        Write-Host "Error al ejecutar el script de activación: $errorMessage"
+        Write-Host "Error al ejecutar el script de activación: $($errorMessage)"
     }
 }
 
@@ -391,9 +391,9 @@ function Run-ActivatedWin {
         Write-Host "Script de activated.win ejecutado correctamente."
     }
     catch {
-        # CORRECCIÓN: Usar variable intermedia para el mensaje de error
+        # CORRECCIÓN: Usar subexpresión para la variable de error
         $errorMessage = $_.Exception.Message
-        Write-Host "Error al ejecutar el script de activated.win: $errorMessage"
+        Write-Host "Error al ejecutar el script de activated.win: $($errorMessage)"
     }
 }
 
@@ -404,9 +404,9 @@ function Run-ChrisTitusScript {
         Write-Host "Script de Chris Titus ejecutado correctamente."
     }
     catch {
-        # CORRECCIÓN: Usar variable intermedia para el mensaje de error
+        # CORRECCIÓN: Usar subexpresión para la variable de error
         $errorMessage = $_.Exception.Message
-        Write-Host "Error al ejecutar el script de Chris Titus: $errorMessage"
+        Write-Host "Error al ejecutar el script de Chris Titus: $($errorMessage)"
     }
 }
 
@@ -467,9 +467,9 @@ function Download-InstallersFromGitHub {
         
         Write-Host "Descarga de instaladores completada."
     } catch {
-        # CORRECCIÓN: Usar variable intermedia para el mensaje de error
+        # CORRECCIÓN: Usar subexpresión para la variable de error
         $errorMessage = $_.Exception.Message
-        Write-Host "Error al descargar instaladores desde GitHub: $errorMessage"
+        Write-Host "Error al descargar instaladores desde GitHub: $($errorMessage)"
     }
 }
 
@@ -689,9 +689,9 @@ foreach ($category in $softwareCategories.Keys) {
                     [System.Windows.Forms.MessageBox]::Show("Error al instalar $($installer.Name). Código de salida: $($process.ExitCode)", "Error", [System.Windows.Forms.MessageBoxButtons]::OK, [System.Windows.Forms.MessageBoxIcon]::Error)
                 }
             } catch {
-                # CORRECCIÓN: Usar variable intermedia para el mensaje de error
+                # CORRECCIÓN: Usar subexpresión para la variable de error
                 $errorMessage = $_.Exception.Message
-                [System.Windows.Forms.MessageBox]::Show("Error al instalar $($installer.Name): $errorMessage", "Error", [System.Windows.Forms.MessageBoxButtons]::OK, [System.Windows.Forms.MessageBoxIcon]::Error)
+                [System.Windows.Forms.MessageBox]::Show("Error al instalar $($installer.Name): $($errorMessage)", "Error", [System.Windows.Forms.MessageBoxButtons]::OK, [System.Windows.Forms.MessageBoxIcon]::Error)
             }
         } else {
             [System.Windows.Forms.MessageBox]::Show("No se pudo encontrar el instalador: $installerName", "Error", [System.Windows.Forms.MessageBoxButtons]::OK, [System.Windows.Forms.MessageBoxIcon]::Error)
