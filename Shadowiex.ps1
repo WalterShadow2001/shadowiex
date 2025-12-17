@@ -2,110 +2,156 @@
 .SYNOPSIS
     Shadowiex - Herramienta de Configuración y Optimización del Sistema
 .DESCRIPTION
-    Una herramienta completa para instalar software, optimizar el sistema y gestionar activaciones de Windows y Office.
+    Una herramienta completa para instalar software, optimizar el sistema y gestionar activaciones de Windows y Office con interfaz profesional.
 .NOTES
     Autor: WalterShadow2001
-    Versión: 2.8
+    Versión: 3.0 - Professional Edition
     Requiere: PowerShell 5.1 o superior, privilegios de administrador
 #>
 
-# Verificar si se ejecuta como administrador, si no reiniciar con privilegios de administrador
-if (-not ([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)) {
+# Configuración inicial
+ $ErrorActionPreference = "Stop"
+ $ProgressPreference = 'SilentlyContinue'
+
+# Verificar si se ejecuta como administrador
+function Test-Administrator {
+    $currentUser = [Security.Principal.WindowsIdentity]::GetCurrent()
+    $principal = New-Object Security.Principal.WindowsPrincipal($currentUser)
+    return $principal.IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)
+}
+
+if (-not (Test-Administrator)) {
     Start-Process powershell.exe "-NoProfile -ExecutionPolicy Bypass -File `"$PSCommandPath`"" -Verb RunAs
     Exit
 }
 
-# Cargar ensamblados necesarios para la GUI
+# Cargar ensamblados necesarios
 Add-Type -AssemblyName System.Windows.Forms
 Add-Type -AssemblyName System.Drawing
+Add-Type -AssemblyName System.Management.Automation
 Add-Type -AssemblyName PresentationFramework
 
-# Crear formulario principal con tema oscuro
- $form = New-Object System.Windows.Forms.Form
- $form.Text = "Shadowiex - Herramienta de Configuración y Optimización del Sistema"
- $form.Size = New-Object System.Drawing.Size(900, 650)
- $form.StartPosition = "CenterScreen"
- $form.BackColor = [System.Drawing.Color]::FromArgb(30, 30, 30)  # Fondo oscuro
- $form.ForeColor = [System.Drawing.Color]::White
- $form.Icon = [System.Drawing.Icon]::ExtractAssociatedIcon("$PSScriptRoot\icon.ico")  # Añadir icono si existe
+# Variables globales
+ $global:InstallProgress = @{}
+ $global:TotalSoftware = 0
+ $global:InstalledSoftware = 0
 
-# Crear control de pestañas con tema oscuro
+# Clase para manejar el estado de instalación
+class InstallationState {
+    [string]$Name
+    [string]$Status
+    [int]$Progress
+    [bool]$IsComplete
+    
+    InstallationState([string]$name) {
+        $this.Name = $name
+        $this.Status = "Pending"
+        $this.Progress = 0
+        $this.IsComplete = $false
+    }
+}
+
+# Crear formulario principal con tema profesional
+ $form = New-Object System.Windows.Forms.Form
+ $form.Text = "Shadowiex - Professional Edition"
+ $form.Size = New-Object System.Drawing.Size(1000, 700)
+ $form.StartPosition = "CenterScreen"
+ $form.BackColor = [System.Drawing.Color]::FromArgb(25, 25, 35)
+ $form.ForeColor = [System.Drawing.Color]::White
+ $form.Icon = [System.Drawing.Icon]::ExtractAssociatedIcon("$PSScriptRoot\icon.ico")
+
+# Crear control de pestañas con tema oscuro profesional
  $tabControl = New-Object System.Windows.Forms.TabControl
  $tabControl.Dock = [System.Windows.Forms.DockStyle]::Fill
- $tabControl.BackColor = [System.Drawing.Color]::FromArgb(45, 45, 45)
+ $tabControl.BackColor = [System.Drawing.Color]::FromArgb(35, 35, 45)
+ $tabControl.Appearance = [System.Windows.Forms.TabAppearance]::Buttons
 
-# Crear pestañas
+# Crear pestañas con diseño mejorado
  $tabBasicSoftware = New-Object System.Windows.Forms.TabPage
  $tabBasicSoftware.Text = "Software Básico"
- $tabBasicSoftware.BackColor = [System.Drawing.Color]::FromArgb(45, 45, 45)
+ $tabBasicSoftware.BackColor = [System.Drawing.Color]::FromArgb(35, 35, 45)
  $tabBasicSoftware.ForeColor = [System.Drawing.Color]::White
 
  $tabInstallers = New-Object System.Windows.Forms.TabPage
- $tabInstallers.Text = "Instaladores"
- $tabInstallers.BackColor = [System.Drawing.Color]::FromArgb(45, 45, 45)
+ $tabInstallers.Text = "Instaladores Personalizados"
+ $tabInstallers.BackColor = [System.Drawing.Color]::FromArgb(35, 35, 45)
  $tabInstallers.ForeColor = [System.Drawing.Color]::White
 
  $tabActivations = New-Object System.Windows.Forms.TabPage
- $tabActivations.Text = "Activaciones y Optimizaciones"
- $tabActivations.BackColor = [System.Drawing.Color]::FromArgb(45, 45, 45)
+ $tabActivations.Text = "Activaciones & Optimización"
+ $tabActivations.BackColor = [System.Drawing.Color]::FromArgb(35, 35, 45)
  $tabActivations.ForeColor = [System.Drawing.Color]::White
 
-# Añadir pestañas al control de pestañas
+ $tabSettings = New-Object System.Windows.Forms.TabPage
+ $tabSettings.Text = "Configuración"
+ $tabSettings.BackColor = [System.Drawing.Color]::FromArgb(35, 35, 45)
+ $tabSettings.ForeColor = [System.Drawing.Color]::White
+
+# Añadir pestañas al control
  $tabControl.Controls.Add($tabBasicSoftware)
  $tabControl.Controls.Add($tabInstallers)
  $tabControl.Controls.Add($tabActivations)
+ $tabControl.Controls.Add($tabSettings)
 
 # Añadir control de pestañas al formulario
  $form.Controls.Add($tabControl)
 
-# Función para crear un botón con estilo profesional
-function Create-StyledButton {
+# Función para crear botones con estilo profesional
+function Create-ProfessionalButton {
     param (
         [string]$text,
         [int]$x,
         [int]$y,
-        [int]$width = 200,
-        [int]$height = 40,
-        [scriptblock]$action
+        [int]$width = 180,
+        [int]$height = 36,
+        [scriptblock]$action,
+        [System.Drawing.Color]$backColor = [System.Drawing.Color]::FromArgb(0, 120, 212)
     )
     
     $button = New-Object System.Windows.Forms.Button
     $button.Location = New-Object System.Drawing.Point($x, $y)
     $button.Size = New-Object System.Drawing.Size($width, $height)
     $button.Text = $text
-    $button.BackColor = [System.Drawing.Color]::FromArgb(0, 120, 212)
+    $button.BackColor = $backColor
     $button.ForeColor = [System.Drawing.Color]::White
     $button.FlatStyle = [System.Windows.Forms.FlatStyle]::Flat
     $button.Font = New-Object System.Drawing.Font("Segoe UI", 10, [System.Drawing.FontStyle]::Regular)
+    $button.FlatAppearance.BorderSize = 0
+    $button.FlatAppearance.MouseOverBackColor = [System.Drawing.Color]::FromArgb(0, 100, 180)
     $button.Add_Click($action)
     
     return $button
 }
 
-# Función para crear un label con estilo
-function Create-StyledLabel {
+# Función para crear labels con estilo profesional
+function Create-ProfessionalLabel {
     param (
         [string]$text,
         [int]$x,
         [int]$y,
         [int]$width = 300,
-        [int]$height = 20
+        [int]$height = 23,
+        [System.Drawing.Font]$font = $null
     )
     
     $label = New-Object System.Windows.Forms.Label
     $label.Text = $text
     $label.Location = New-Object System.Drawing.Point($x, $y)
     $label.Size = New-Object System.Drawing.Size($width, $height)
-    $label.Font = New-Object System.Drawing.Font("Segoe UI", 10, [System.Drawing.FontStyle]::Regular)
     $label.ForeColor = [System.Drawing.Color]::White
+    if ($font) {
+        $label.Font = $font
+    } else {
+        $label.Font = New-Object System.Drawing.Font("Segoe UI", 10, [System.Drawing.FontStyle]::Regular)
+    }
     
     return $label
 }
 
-# Función para verificar si winget está instalado
-function Check-WingetInstalled {
+# Función para verificar si winget está instalado (optimizada)
+function Test-Winget {
     try {
-        $wingetVersion = winget --version
+        $null = winget --version
         return $true
     }
     catch {
@@ -113,10 +159,10 @@ function Check-WingetInstalled {
     }
 }
 
-# Función para verificar si chocolatey está instalado
-function Check-ChocolateyInstalled {
+# Función para verificar si chocolatey está instalado (optimizada)
+function Test-Chocolatey {
     try {
-        $chocoVersion = choco --version
+        $null = choco --version
         return $true
     }
     catch {
@@ -124,19 +170,18 @@ function Check-ChocolateyInstalled {
     }
 }
 
-# Función para instalar winget si no está instalado
+# Función para instalar winget si no está instalado (optimizada)
 function Install-Winget {
     Write-Host "Instalando winget..."
     
-    $progressPreference = 'silentlyContinue'
-    $latestWingetMsixBundleUri = "https://github.com/microsoft/winget-cli/releases/latest/download/Microsoft.DesktopAppInstaller_8wekyb3d8bbwe.msixbundle"
-    $latestWingetMsixBundle = "$env:TEMP\Microsoft.DesktopAppInstaller_8wekyb3d8bbwe.msixbundle"
-    
     try {
-        Invoke-WebRequest -Uri $latestWingetMsixBundleUri -OutFile $latestWingetMsixBundle
-        Add-AppxPackage -Path $latestWingetMsixBundle
+        $latestWingetMsixBundleUri = "https://github.com/microsoft/winget-cli/releases/latest/download/Microsoft.DesktopAppInstaller_8wekyb3d8bbwe.msixbundle"
+        $latestWingetMsixBundle = "$env:TEMP\Microsoft.DesktopAppInstaller_8wekyb3d8bbwe.msixbundle"
         
-        if (Check-WingetInstalled) {
+        Invoke-WebRequest -Uri $latestWingetMsixBundleUri -OutFile $latestWingetMsixBundle -ErrorAction Stop
+        Add-AppxPackage -Path $latestWingetMsixBundle -ErrorAction Stop
+        
+        if (Test-Winget) {
             Write-Host "Winget instalado correctamente."
             return $true
         }
@@ -146,13 +191,12 @@ function Install-Winget {
         }
     }
     catch {
-        $errorMessage = $_.Exception.Message
-        Write-Host "Error al instalar Winget: $errorMessage"
+        Write-Host "Error al instalar Winget: $($_.Exception.Message)"
         return $false
     }
 }
 
-# Función para instalar chocolatey
+# Función para instalar chocolatey (optimizada)
 function Install-Chocolatey {
     Write-Host "Instalando Chocolatey..."
     try {
@@ -160,7 +204,7 @@ function Install-Chocolatey {
         [System.Net.ServicePointManager]::SecurityProtocol = [System.Net.ServicePointManager]::SecurityProtocol -bor 3072
         Invoke-Expression ((New-Object System.Net.WebClient).DownloadString('https://community.chocolatey.org/install.ps1'))
         
-        if (Check-ChocolateyInstalled) {
+        if (Test-Chocolatey) {
             Write-Host "Chocolatey instalado correctamente."
             return $true
         }
@@ -170,217 +214,237 @@ function Install-Chocolatey {
         }
     }
     catch {
-        $errorMessage = $_.Exception.Message
-        Write-Host "Error al instalar Chocolatey: $errorMessage"
+        Write-Host "Error al instalar Chocolatey: $($_.Exception.Message)"
         return $false
     }
 }
 
-# Función para instalar software usando winget o chocolatey
+# Función para instalar software (optimizada con progreso)
 function Install-Software {
     param (
         [string]$id,
-        [string]$name
+        [string]$name,
+        [System.Windows.Forms.ProgressBar]$progressBar,
+        [System.Windows.Forms.Label]$statusLabel
     )
     
-    Write-Host "Instalando $name..."
+    $statusLabel.Text = "Instalando $name..."
+    $progressBar.Value = 0
     
-    # Intentar instalar con Winget primero si está disponible
-    if (Check-WingetInstalled) {
-        winget install --id $id --accept-source-agreements --accept-package-agreements -h | Out-Host
-        if ($LASTEXITCODE -eq 0) {
-            Write-Host "$name instalado correctamente con Winget."
-            return $true
+    # Intentar instalar con Winget primero
+    if (Test-Winget) {
+        try {
+            $process = Start-Process -FilePath "winget" -ArgumentList "install", "--id", $id, "--accept-source-agreements", "--accept-package-agreements", "-h" -NoNewWindow -PassThru -Wait
+            $progressBar.Value = 50
+            
+            if ($process.ExitCode -eq 0) {
+                $statusLabel.Text = "$name instalado correctamente con Winget."
+                $progressBar.Value = 100
+                return $true
+            }
+            else {
+                $statusLabel.Text = "Error con Winget. Intentando Chocolatey..."
+            }
         }
-        else {
-            Write-Host "Error al instalar $name con Winget. Intentando con Chocolatey..."
+        catch {
+            $statusLabel.Text = "Error con Winget. Intentando Chocolatey..."
         }
     }
     
-    # Si Winget no está disponible o falló, intentar con Chocolatey
-    if (Check-ChocolateyInstalled) {
-        $chocoId = $id.Split('.')[-1].ToLower()
-        choco install $chocoId -y | Out-Host
-        if ($LASTEXITCODE -eq 0) {
-            Write-Host "$name instalado correctamente con Chocolatey."
-            return $true
+    # Si Winget falló o no está disponible, intentar con Chocolatey
+    if (Test-Chocolatey) {
+        try {
+            $chocoId = $id.Split('.')[-1].ToLower()
+            $process = Start-Process -FilePath "choco" -ArgumentList "install", $chocoId, "-y" -NoNewWindow -PassThru -Wait
+            $progressBar.Value = 50
+            
+            if ($process.ExitCode -eq 0) {
+                $statusLabel.Text = "$name instalado correctamente con Chocolatey."
+                $progressBar.Value = 100
+                return $true
+            }
+            else {
+                $statusLabel.Text = "Error al instalar $name con Chocolatey."
+                return $false
+            }
         }
-        else {
-            Write-Host "Error al instalar $name con Chocolatey."
+        catch {
+            $statusLabel.Text = "Error al instalar $name: $($_.Exception.Message)"
             return $false
         }
     }
     else {
-        Write-Host "No se pudo instalar $name. Ni Winget ni Chocolatey están disponibles."
+        $statusLabel.Text = "No se pudo instalar $name. Ni Winget ni Chocolatey están disponibles."
         return $false
     }
 }
 
-# Función para descargar e instalar instaladores personalizados (CORREGIDA DEFINITIVAMENTE)
+# Función para descargar e instalar instaladores personalizados (optimizada)
 function Download-And-Install {
     param (
         [string]$url,
         [string]$fileName,
-        [string]$downloadPath
+        [string]$downloadPath,
+        [System.Windows.Forms.ProgressBar]$progressBar,
+        [System.Windows.Forms.Label]$statusLabel
     )
     
     $filePath = Join-Path -Path $downloadPath -ChildPath $fileName
     
     try {
-        Write-Host "Descargando $fileName..."
-        Invoke-WebRequest -Uri $url -OutFile $filePath -ErrorAction Stop
+        $statusLabel.Text = "Descargando $fileName..."
+        $progressBar.Value = 0
         
-        Write-Host "Instalando $fileName..."
-        # Usar WaitForExit en lugar de -Wait para mejor control
+        Invoke-WebRequest -Uri $url -OutFile $filePath -ErrorAction Stop
+        $progressBar.Value = 50
+        
+        $statusLabel.Text = "Instalando $fileName..."
         $process = Start-Process -FilePath $filePath -ArgumentList "/S", "/quiet", "/norestart" -PassThru
         $process.WaitForExit()
         
         if ($process.ExitCode -eq 0) {
-            Write-Host "$fileName instalado correctamente."
+            $statusLabel.Text = "$fileName instalado correctamente."
+            $progressBar.Value = 100
             return $true
         }
         else {
-            Write-Host "Error en la instalación de $fileName. Código de salida: $($process.ExitCode)"
+            $statusLabel.Text = "Error en la instalación de $fileName. Código: $($process.ExitCode)"
             return $false
         }
     }
     catch {
-        # CORRECCIÓN: Usar concatenación simple y variable correctamente nombrada
-        $errorMessage = $_.Exception.Message
-        # Construir el mensaje sin interpolación directa
-        $message = "Error al descargar o instalar " + $fileName + ": " + $errorMessage
-        Write-Host $message
+        $statusLabel.Text = "Error: $($_.Exception.Message)"
         return $false
     }
 }
 
-# Función para crear un punto de restauración
+# Función para crear un punto de restauración (optimizada)
 function Create-RestorePoint {
-    Enable-ComputerRestore -Drive "C:\"
-    Checkpoint-Computer -Description "Punto de Restauración de Shadowiex" -RestorePointType "APPLICATION_INSTALL"
-    Write-Host "Punto de restauración creado correctamente."
-}
-
-# Función para limpiar archivos temporales
-function Clean-TempFiles {
-    Write-Host "Limpiando archivos temporales..."
-    
-    # Limpiar carpeta Temp de Windows
-    Get-ChildItem -Path "$env:windir\Temp" -Recurse | Remove-Item -Force -Recurse -ErrorAction SilentlyContinue
-    
-    # Limpiar carpeta Temp del usuario
-    Get-ChildItem -Path "$env:TEMP" -Recurse | Remove-Item -Force -Recurse -ErrorAction SilentlyContinue
-    
-    # Limpiar Prefetch
-    Get-ChildItem -Path "$env:windir\Prefetch" -Recurse | Remove-Item -Force -Recurse -ErrorAction SilentlyContinue
-    
-    # Limpiar carpeta SoftwareDistribution
-    Stop-Service -Name wuauserv -Force
-    Get-ChildItem -Path "$env:windir\SoftwareDistribution" -Recurse | Remove-Item -Force -Recurse -ErrorAction SilentlyContinue
-    Start-Service -Name wuauserv
-    
-    Write-Host "Archivos temporales limpiados correctamente."
-}
-
-# Función para optimizar la red
-function Optimize-Network {
-    Write-Host "Optimizando la red..."
-    
-    $netshPath = "$env:SystemRoot\System32\netsh.exe"
-    $ipconfigPath = "$env:SystemRoot\System32\ipconfig.exe"
-    
-    # Restablecer pila TCP/IP
-    Start-Process -FilePath $netshPath -ArgumentList "int ip reset" -Wait -NoNewWindow
-    
-    # Restablecer catálogo Winsock
-    Start-Process -FilePath $netshPath -ArgumentList "winsock reset" -Wait -NoNewWindow
-    
-    # Vaciar caché DNS
-    Start-Process -FilePath $ipconfigPath -ArgumentList "/flushdns" -Wait -NoNewWindow
-    
-    # Establecer DNS a Google DNS
-    $networkInterfaces = Get-NetAdapter | Where-Object { $_.Status -eq "Up" }
-    foreach ($interface in $networkInterfaces) {
-        Set-DnsClientServerAddress -InterfaceIndex $interface.ifIndex -ServerAddresses ("8.8.8.8", "8.8.4.4")
-    }
-    
-    Write-Host "Red optimizada correctamente."
-}
-
-# Función para optimizar el sistema
-function Optimize-System {
-    Write-Host "Optimizando el sistema..."
-    
-    # Deshabilitar servicios innecesarios
-    $servicesToDisable = @(
-        "DiagTrack",                # Experiencias del usuario conectado y telemetría
-        "dmwappushservice",         # Servicio de enrutamiento de mensajes de inserción WAP
-        "MapsBroker",               # Administrador de mapas descargados
-        "lfsvc",                    # Servicio de geolocalización
-        "SharedAccess",             # Uso compartido de conexión a Internet
-        "lltdsvc",                  # Asignador de descubrimiento de topología de nivel de vínculo
-        "RemoteRegistry",           # Registro remoto
-        "RetailDemo"                # Servicio de demostración en tienda
-    )
-    
-    foreach ($service in $servicesToDisable) {
-        Set-Service -Name $service -StartupType Disabled -ErrorAction SilentlyContinue
-        Stop-Service -Name $service -Force -ErrorAction SilentlyContinue
-    }
-    
-    $powercfgPath = "$env:SystemRoot\System32\powercfg.exe"
-    
-    # Deshabilitar hibernación para liberar espacio en disco
-    Start-Process -FilePath $powercfgPath -ArgumentList "/h", "off" -Wait -NoNewWindow
-    
-    # Establecer plan de energía a alto rendimiento
-    Start-Process -FilePath $powercfgPath -ArgumentList "/setactive", "8c5e7fda-e8bf-4a96-9a85-a6e23a8c635c" -Wait -NoNewWindow
-    
-    Write-Host "Sistema optimizado correctamente."
-}
-
-# Función para activar Windows y Office (corregida definitivamente)
-function Activate-WindowsAndOffice {
-    $scriptRoot = if ($PSScriptRoot) { $PSScriptRoot } else { $PWD.Path }
-    $tsforgeScript = Join-Path -Path $scriptRoot -ChildPath "TSforge_Activation.cmd"
-    
-    if (-not (Test-Path -Path $tsforgeScript)) {
-        Write-Host "Descargando script de activación TSforge..."
-        $tsforgeUrl = "https://github.com/WalterShadow2001/shadowiex/raw/main/TSforge_Activation.cmd"
-        
-        try {
-            Invoke-WebRequest -Uri $tsforgeUrl -OutFile $tsforgeScript -ErrorAction Stop
-            if (Test-Path -Path $tsforgeScript) {
-                Write-Host "Script de activación TSforge descargado correctamente."
-            }
-        } catch {
-            $errorMessage = $_.Exception.Message
-            $message = "Error al descargar el script de activación: " + $errorMessage
-            Write-Host $message
-            return
-        }
-    }
-    
     try {
-        Write-Host "Ejecutando script de activación..."
-        if (Test-Path -Path $tsforgeScript) {
-            $tempBatchFile = Join-Path -Path $env:TEMP -ChildPath "activate_temp.cmd"
-            
-            # Usar Write-Output en lugar de @" para evitar problemas de formato
-            Write-Output "@echo off" | Out-File -FilePath $tempBatchFile -Encoding ASCII
-            Write-Output "set _actwin=1" | Out-File -FilePath $tempBatchFile -Encoding ASCII -Append
-            Write-Output "set _actoff=1" | Out-File -FilePath $tempBatchFile -Encoding ASCII -Append
-            Write-Output "call `"$tsforgeScript`"" | Out-File -FilePath $tempBatchFile -Encoding ASCII -Append
-            
-            Start-Process -FilePath "cmd.exe" -ArgumentList "/c", "$tempBatchFile" -Wait -NoNewWindow
-            Remove-Item -Path $tempBatchFile -Force
-            
-            Write-Host "Activación completada."
+        Enable-ComputerRestore -Drive "C:\" -ErrorAction Stop
+        Checkpoint-Computer -Description "Punto de Restauración de Shadowiex" -RestorePointType "APPLICATION_INSTALL" -ErrorAction Stop
+        [System.Windows.Forms.MessageBox]::Show("Punto de restauración creado correctamente.", "Éxito", [System.Windows.Forms.MessageBoxButtons]::OK, [System.Windows.Forms.MessageBoxIcon]::Information)
+    }
+    catch {
+        [System.Windows.Forms.MessageBox]::Show("Error al crear punto de restauración: $($_.Exception.Message)", "Error", [System.Windows.Forms.MessageBoxButtons]::OK, [System.Windows.Forms.MessageBoxIcon]::Error)
+    }
+}
+
+# Función para limpiar archivos temporales (optimizada)
+function Clean-TempFiles {
+    try {
+        $status = "Limpiando archivos temporales..."
+        Write-Host $status
+        
+        # Limpiar carpeta Temp de Windows
+        Get-ChildItem -Path "$env:windir\Temp" -Recurse -ErrorAction SilentlyContinue | Remove-Item -Force -Recurse -ErrorAction SilentlyContinue
+        
+        # Limpiar carpeta Temp del usuario
+        Get-ChildItem -Path "$env:TEMP" -Recurse -ErrorAction SilentlyContinue | Remove-Item -Force -Recurse -ErrorAction SilentlyContinue
+        
+        # Limpiar Prefetch
+        Get-ChildItem -Path "$env:windir\Prefetch" -Recurse -ErrorAction SilentlyContinue | Remove-Item -Force -Recurse -ErrorAction SilentlyContinue
+        
+        # Limpiar carpeta SoftwareDistribution
+        Stop-Service -Name wuauserv -Force -ErrorAction SilentlyContinue
+        Get-ChildItem -Path "$env:windir\SoftwareDistribution" -Recurse -ErrorAction SilentlyContinue | Remove-Item -Force -Recurse -ErrorAction SilentlyContinue
+        Start-Service -Name wuauserv -ErrorAction SilentlyContinue
+        
+        [System.Windows.Forms.MessageBox]::Show("Archivos temporales limpiados correctamente.", "Limpieza", [System.Windows.Forms.MessageBoxButtons]::OK, [System.Windows.Forms.MessageBoxIcon]::Information)
+    }
+    catch {
+        [System.Windows.Forms.MessageBox]::Show("Error al limpiar archivos: $($_.Exception.Message)", "Error", [System.Windows.Forms.MessageBoxButtons]::OK, [System.Windows.Forms.MessageBoxIcon]::Error)
+    }
+}
+
+# Función para optimizar la red (optimizada)
+function Optimize-Network {
+    try {
+        $status = "Optimizando la red..."
+        Write-Host $status
+        
+        $netshPath = "$env:SystemRoot\System32\netsh.exe"
+        $ipconfigPath = "$env:SystemRoot\System32\ipconfig.exe"
+        
+        # Restablecer pila TCP/IP
+        Start-Process -FilePath $netshPath -ArgumentList "int ip reset" -Wait -NoNewWindow -ErrorAction Stop
+        
+        # Restablecer catálogo Winsock
+        Start-Process -FilePath $netshPath -ArgumentList "winsock reset" -Wait -NoNewWindow -ErrorAction Stop
+        
+        # Vaciar caché DNS
+        Start-Process -FilePath $ipconfigPath -ArgumentList "/flushdns" -Wait -NoNewWindow -ErrorAction Stop
+        
+        # Establecer DNS a Google DNS
+        $networkInterfaces = Get-NetAdapter | Where-Object { $_.Status -eq "Up" }
+        foreach ($interface in $networkInterfaces) {
+            Set-DnsClientServerAddress -InterfaceIndex $interface.ifIndex -ServerAddresses ("8.8.8.8", "8.8.4.4") -ErrorAction Stop
         }
-    } catch {
-        $errorMessage = $_.Exception.Message
-        $message = "Error al ejecutar el script de activación: " + $errorMessage
-        Write-Host $message
+        
+        [System.Windows.Forms.MessageBox]::Show("Red optimizada correctamente.", "Optimización", [System.Windows.Forms.MessageBoxButtons]::OK, [System.Windows.Forms.MessageBoxIcon]::Information)
+    }
+    catch {
+        [System.Windows.Forms.MessageBox]::Show("Error al optimizar red: $($_.Exception.Message)", "Error", [System.Windows.Forms.MessageBoxButtons]::OK, [System.Windows.Forms.MessageBoxIcon]::Error)
+    }
+}
+
+# Función para optimizar el sistema (optimizada)
+function Optimize-System {
+    try {
+        $status = "Optimizando el sistema..."
+        Write-Host $status
+        
+        # Deshabilitar servicios innecesarios
+        $servicesToDisable = @(
+            "DiagTrack", "dmwappushservice", "MapsBroker", "lfsvc", 
+            "SharedAccess", "lltdsvc", "RemoteRegistry", "RetailDemo"
+        )
+        
+        foreach ($service in $servicesToDisable) {
+            Set-Service -Name $service -StartupType Disabled -ErrorAction SilentlyContinue
+            Stop-Service -Name $service -Force -ErrorAction SilentlyContinue
+        }
+        
+        $powercfgPath = "$env:SystemRoot\System32\powercfg.exe"
+        
+        # Deshabilitar hibernación
+        Start-Process -FilePath $powercfgPath -ArgumentList "/h", "off" -Wait -NoNewWindow -ErrorAction Stop
+        
+        # Establecer plan de energía a alto rendimiento
+        Start-Process -FilePath $powercfgPath -ArgumentList "/setactive", "8c5e7fda-e8bf-4a96-9a85-a6e23a8c635c" -Wait -NoNewWindow -ErrorAction Stop
+        
+        [System.Windows.Forms.MessageBox]::Show("Sistema optimizado correctamente.", "Optimización", [System.Windows.Forms.MessageBoxButtons]::OK, [System.Windows.Forms.MessageBoxIcon]::Information)
+    }
+    catch {
+        [System.Windows.Forms.MessageBox]::Show("Error al optimizar sistema: $($_.Exception.Message)", "Error", [System.Windows.Forms.MessageBoxButtons]::OK, [System.Windows.Forms.MessageBoxIcon]::Error)
+    }
+}
+
+# Función para activar Windows y Office (optimizada)
+function Activate-WindowsAndOffice {
+    try {
+        $scriptRoot = if ($PSScriptRoot) { $PSScriptRoot } else { $PWD.Path }
+        $tsforgeScript = Join-Path -Path $scriptRoot -ChildPath "TSforge_Activation.cmd"
+        
+        if (-not (Test-Path -Path $tsforgeScript)) {
+            $tsforgeUrl = "https://github.com/WalterShadow2001/shadowiex/raw/main/TSforge_Activation.cmd"
+            Invoke-WebRequest -Uri $tsforgeUrl -OutFile $tsforgeScript -ErrorAction Stop
+        }
+        
+        $tempBatchFile = Join-Path -Path $env:TEMP -ChildPath "activate_temp.cmd"
+        
+        "@echo off
+set _actwin=1
+set _actoff=1
+call `"$tsforgeScript`"" | Out-File -FilePath $tempBatchFile -Encoding ASCII
+        
+        Start-Process -FilePath "cmd.exe" -ArgumentList "/c", "$tempBatchFile" -Wait -NoNewWindow
+        Remove-Item -Path $tempBatchFile -Force
+        
+        [System.Windows.Forms.MessageBox]::Show("Activación completada.", "Activación", [System.Windows.Forms.MessageBoxButtons]::OK, [System.Windows.Forms.MessageBoxIcon]::Information)
+    }
+    catch {
+        [System.Windows.Forms.MessageBox]::Show("Error al activar: $($_.Exception.Message)", "Error", [System.Windows.Forms.MessageBoxButtons]::OK, [System.Windows.Forms.MessageBoxIcon]::Error)
     }
 }
 
@@ -388,12 +452,10 @@ function Activate-WindowsAndOffice {
 function Run-ActivatedWin {
     try {
         Invoke-Expression (Invoke-RestMethod -Uri "https://get.activated.win")
-        Write-Host "Script de activated.win ejecutado correctamente."
+        [System.Windows.Forms.MessageBox]::Show("Script de Activated.Win ejecutado.", "Script Ejecutado", [System.Windows.Forms.MessageBoxButtons]::OK, [System.Windows.Forms.MessageBoxIcon]::Information)
     }
     catch {
-        $errorMessage = $_.Exception.Message
-        $message = "Error al ejecutar el script de activated.win: " + $errorMessage
-        Write-Host $message
+        [System.Windows.Forms.MessageBox]::Show("Error: $($_.Exception.Message)", "Error", [System.Windows.Forms.MessageBoxButtons]::OK, [System.Windows.Forms.MessageBoxIcon]::Error)
     }
 }
 
@@ -401,40 +463,28 @@ function Run-ActivatedWin {
 function Run-ChrisTitusScript {
     try {
         Invoke-Expression (Invoke-RestMethod -Uri "https://christitus.com/win")
-        Write-Host "Script de Chris Titus ejecutado correctamente."
+        [System.Windows.Forms.MessageBox]::Show("Script de Chris Titus ejecutado.", "Script Ejecutado", [System.Windows.Forms.MessageBoxButtons]::OK, [System.Windows.Forms.MessageBoxIcon]::Information)
     }
     catch {
-        $errorMessage = $_.Exception.Message
-        $message = "Error al ejecutar el script de Chris Titus: " + $errorMessage
-        Write-Host $message
+        [System.Windows.Forms.MessageBox]::Show("Error: $($_.Exception.Message)", "Error", [System.Windows.Forms.MessageBoxButtons]::OK, [System.Windows.Forms.MessageBoxIcon]::Error)
     }
 }
 
-# Función para gestionar los instaladores
+# Función para gestionar los instaladores personalizados
 function Initialize-Installers {
     $scriptRoot = if ($PSScriptRoot) { $PSScriptRoot } else { $PWD.Path }
     $instaladoresPath = Join-Path -Path $scriptRoot -ChildPath "instaladores"
     
     if (-not (Test-Path -Path $instaladoresPath)) {
-        Write-Host "Creando directorio de instaladores..."
         New-Item -ItemType Directory -Path $instaladoresPath -Force | Out-Null
     }
     
-    $instaladores = Get-ChildItem -Path $instaladoresPath -Filter "*.exe" -ErrorAction SilentlyContinue
-    
-    if (-not $instaladores -or $instaladores.Count -eq 0) {
-        Write-Host "No se encontraron instaladores en la carpeta $instaladoresPath."
-        return $null
-    }
-    
-    return $instaladores
+    return Get-ChildItem -Path $instaladoresPath -Filter "*.exe" -ErrorAction SilentlyContinue
 }
 
-# Función para descargar instaladores desde GitHub (corregida definitivamente)
+# Función para descargar instaladores desde GitHub
 function Download-InstallersFromGitHub {
-    param (
-        [string]$destinationPath
-    )
+    param ([string]$destinationPath)
     
     try {
         if (-not (Test-Path -Path $destinationPath)) {
@@ -458,303 +508,446 @@ function Download-InstallersFromGitHub {
             $instaladores = Get-ChildItem -Path $sourceDir -Filter "*.exe" -ErrorAction SilentlyContinue
             foreach ($instalador in $instaladores) {
                 Copy-Item -Path $instalador.FullName -Destination $destinationPath -Force
-                Write-Host "Copiado: $($instalador.Name)"
             }
         }
         
         Remove-Item -Path $tempZip -Force
         Remove-Item -Path $extractPath -Recurse -Force
         
-        Write-Host "Descarga de instaladores completada."
-    } catch {
-        $errorMessage = $_.Exception.Message
-        $message = "Error al descargar instaladores desde GitHub: " + $errorMessage
-        Write-Host $message
+        [System.Windows.Forms.MessageBox]::Show("Descarga de instaladores completada.", "Descarga", [System.Windows.Forms.MessageBoxButtons]::OK, [System.Windows.Forms.MessageBoxIcon]::Information)
+    }
+    catch {
+        [System.Windows.Forms.MessageBox]::Show("Error: $($_.Exception.Message)", "Error", [System.Windows.Forms.MessageBoxButtons]::OK, [System.Windows.Forms.MessageBoxIcon]::Error)
     }
 }
 
-# Definir categorías de software y sus aplicaciones
+# Definir categorías de software con información adicional
  $softwareCategories = @{
     "Navegadores" = @(
-        @{id = "Google.Chrome"; name = "Google Chrome"},
-        @{id = "Mozilla.Firefox"; name = "Mozilla Firefox"},
-        @{id = "Opera.Opera"; name = "Opera"},
-        @{id = "Microsoft.Edge"; name = "Microsoft Edge"},
-        @{id = "BraveSoftware.BraveBrowser"; name = "Navegador Brave"}
+        @{id = "Google.Chrome"; name = "Google Chrome"; icon = "🌐"},
+        @{id = "Mozilla.Firefox"; name = "Mozilla Firefox"; icon = "🦊"},
+        @{id = "Opera.Opera"; name = "Opera"; icon = "🎭"},
+        @{id = "Microsoft.Edge"; name = "Microsoft Edge"; icon = "🔵"},
+        @{id = "BraveSoftware.BraveBrowser"; name = "Navegador Brave"; icon = "🦁"}
     )
     "Desarrollo" = @(
-        @{id = "Git.Git"; name = "Git"},
-        @{id = "GitHub.GitHubDesktop"; name = "GitHub Desktop"},
-        @{id = "Microsoft.VisualStudioCode"; name = "Visual Studio Code"},
-        @{id = "Notepad++.Notepad++"; name = "Notepad++"}
+        @{id = "Git.Git"; name = "Git"; icon = "📁"},
+        @{id = "GitHub.GitHubDesktop"; name = "GitHub Desktop"; icon = "🐙"},
+        @{id = "Microsoft.VisualStudioCode"; name = "Visual Studio Code"; icon = "🔧"},
+        @{id = "Notepad++.Notepad++"; name = "Notepad++"; icon = "📝"}
     )
     "Multimedia" = @(
-        @{id = "VideoLAN.VLC"; name = "VLC Media Player"},
-        @{id = "GIMP.GIMP"; name = "GIMP"},
-        @{id = "IrfanSkiljan.IrfanView"; name = "IrfanView"}
+        @{id = "VideoLAN.VLC"; name = "VLC Media Player"; icon = "🎵"},
+        @{id = "GIMP.GIMP"; name = "GIMP"; icon = "🎨"},
+        @{id = "IrfanSkiljan.IrfanView"; name = "IrfanView"; icon = "🖼️"}
     )
     "Comunicación" = @(
-        @{id = "Zoom.Zoom"; name = "Zoom"},
-        @{id = "Microsoft.Teams"; name = "Microsoft Teams"},
-        @{id = "Discord.Discord"; name = "Discord"},
-        @{id = "Telegram.TelegramDesktop"; name = "Telegram"},
-        @{id = "WhatsApp.WhatsApp"; name = "WhatsApp Desktop"},
-        @{id = "Slack.Slack"; name = "Slack"}
+        @{id = "Zoom.Zoom"; name = "Zoom"; icon = "📞"},
+        @{id = "Microsoft.Teams"; name = "Microsoft Teams"; icon = "👥"},
+        @{id = "Discord.Discord"; name = "Discord"; icon = "💬"},
+        @{id = "Telegram.TelegramDesktop"; name = "Telegram"; icon = "📱"},
+        @{id = "WhatsApp.WhatsApp"; name = "WhatsApp Desktop"; icon = "💬"},
+        @{id = "Slack.Slack"; name = "Slack"; icon = "📋"}
     )
     "Utilidades" = @(
-        @{id = "7zip.7zip"; name = "7-Zip"},
-        @{id = "Adobe.Acrobat.Reader.64-bit"; name = "Adobe Reader"},
-        @{id = "RARLab.WinRAR"; name = "WinRAR"},
-        @{id = "TeamViewer.TeamViewer"; name = "TeamViewer"},
-        @{id = "Rufus.Rufus"; name = "Rufus"}
+        @{id = "7zip.7zip"; name = "7-Zip"; icon = "🗜️"},
+        @{id = "Adobe.Acrobat.Reader.64-bit"; name = "Adobe Reader"; icon = "📄"},
+        @{id = "RARLab.WinRAR"; name = "WinRAR"; icon = "🗜️"},
+        @{id = "TeamViewer.TeamViewer"; name = "TeamViewer"; icon = "👥"},
+        @{id = "Rufus.Rufus"; name = "Rufus"; icon = "🔧"}
     )
     "Runtimes" = @(
-        @{id = "Oracle.JavaRuntimeEnvironment"; name = "Java Runtime Environment"},
-        @{id = "Microsoft.DotNet.Runtime.6"; name = ".NET Runtime 6"},
-        @{id = "Microsoft.DotNet.Runtime.7"; name = ".NET Runtime 7"},
-        @{id = "Microsoft.DotNet.Framework"; name = ".NET Framework"}
+        @{id = "Oracle.JavaRuntimeEnvironment"; name = "Java Runtime Environment"; icon = "☕"},
+        @{id = "Microsoft.DotNet.Runtime.6"; name = ".NET Runtime 6"; icon = "🟢"},
+        @{id = "Microsoft.DotNet.Runtime.7"; name = ".NET Runtime 7"; icon = "🟢"},
+        @{id = "Microsoft.DotNet.Framework"; name = ".NET Framework"; icon = "🟢"}
     )
 }
 
-# Poblar pestaña de Software Básico
- $basicSoftwareLabel = Create-StyledLabel -text "Seleccione el software a instalar:" -x 20 -y 20
- $tabBasicSoftware.Controls.Add($basicSoftwareLabel)
-
- $scrollPanel = New-Object System.Windows.Forms.Panel
- $scrollPanel.AutoScroll = $true
- $scrollPanel.Location = New-Object System.Drawing.Point(20, 50)
- $scrollPanel.Size = New-Object System.Drawing.Size(800, 450)
- $scrollPanel.BackColor = [System.Drawing.Color]::FromArgb(45, 45, 45)
- $tabBasicSoftware.Controls.Add($scrollPanel)
-
- $global:allCheckboxes = @()
- $yPos = 10
-
-foreach ($category in $softwareCategories.Keys) {
-    $categoryLabel = Create-StyledLabel -text $category -x 10 -y $yPos -width 780
-    $categoryLabel.Font = New-Object System.Drawing.Font("Segoe UI", 10, [System.Drawing.FontStyle]::Bold)
-    $scrollPanel.Controls.Add($categoryLabel)
+# Poblar pestaña de Software Básico con diseño mejorado
+function Populate-SoftwareTab {
+    $tabBasicSoftware.Controls.Clear()
     
-    $yPos += 25
+    # Título
+    $titleLabel = Create-ProfessionalLabel -text "Seleccione el software a instalar:" -x 20 -y 15 -font (New-Object System.Drawing.Font("Segoe UI", 12, [System.Drawing.FontStyle]::Bold))
+    $tabBasicSoftware.Controls.Add($titleLabel)
     
-    foreach ($software in $softwareCategories[$category]) {
-        $checkbox = New-Object System.Windows.Forms.CheckBox
-        $checkbox.Text = $software.name
-        $checkbox.Location = New-Object System.Drawing.Point(30, $yPos)
-        $checkbox.Size = New-Object System.Drawing.Size(750, 20)
-        $checkbox.Tag = $software.id
-        $checkbox.ForeColor = [System.Drawing.Color]::White
-        $checkbox.BackColor = [System.Drawing.Color]::FromArgb(45, 45, 45)
-        $scrollPanel.Controls.Add($checkbox)
+    # Panel con scroll
+    $scrollPanel = New-Object System.Windows.Forms.Panel
+    $scrollPanel.AutoScroll = $true
+    $scrollPanel.Location = New-Object System.Drawing.Point(20, 50)
+    $scrollPanel.Size = New-Object System.Drawing.Size(940, 450)
+    $scrollPanel.BackColor = [System.Drawing.Color]::FromArgb(45, 45, 55)
+    $tabBasicSoftware.Controls.Add($scrollPanel)
+    
+    $global:allCheckboxes = @()
+    $yPos = 10
+    
+    foreach ($category in $softwareCategories.Keys) {
+        # Etiqueta de categoría
+        $categoryLabel = Create-ProfessionalLabel -text $category -x 10 -y $yPos -font (New-Object System.Drawing.Font("Segoe UI", 11, [System.Drawing.FontStyle]::Bold))
+        $scrollPanel.Controls.Add($categoryLabel)
         
-        $global:allCheckboxes += @{checkbox = $checkbox; id = $software.id; name = $software.name}
+        $yPos += 30
         
-        $yPos += 25
+        foreach ($software in $softwareCategories[$category]) {
+            # Checkbox con icono
+            $checkbox = New-Object System.Windows.Forms.CheckBox
+            $checkbox.Text = "$($software.icon) $($software.name)"
+            $checkbox.Location = New-Object System.Drawing.Point(30, $yPos)
+            $checkbox.Size = New-Object System.Drawing.Size(900, 25)
+            $checkbox.Tag = $software.id
+            $checkbox.ForeColor = [System.Drawing.Color]::White
+            $checkbox.BackColor = [System.Drawing.Color]::FromArgb(45, 45, 55)
+            $scrollPanel.Controls.Add($checkbox)
+            
+            $global:allCheckboxes += @{checkbox = $checkbox; id = $software.id; name = $software.name}
+            
+            $yPos += 30
+        }
+        
+        $yPos += 15
     }
     
-    $yPos += 15
+    # Botones de acción
+    $installButton = Create-ProfessionalButton -text "Instalar Software Seleccionado" -x 20 -y 520 -width 220 -action {
+        $selectedSoftware = $global:allCheckboxes | Where-Object { $_.checkbox.Checked }
+        
+        if ($selectedSoftware.Count -eq 0) {
+            [System.Windows.Forms.MessageBox]::Show("Por favor, seleccione al menos un software para instalar.", "Sin Selección", [System.Windows.Forms.MessageBoxButtons]::OK, [System.Windows.Forms.MessageBoxIcon]::Warning)
+            return
+        }
+        
+        # Verificar e instalar winget/chocolatey si es necesario
+        if (-not (Test-Winget)) {
+            if (-not (Install-Winget)) {
+                if (-not (Install-Chocolatey)) {
+                    [System.Windows.Forms.MessageBox]::Show("No se pudo instalar ni Winget ni Chocolatey. Por favor, instale uno de ellos manualmente.", "Error", [System.Windows.Forms.MessageBoxButtons]::OK, [System.Windows.Forms.MessageBoxIcon]::Error)
+                    return
+                }
+            }
+        }
+        
+        # Crear formulario de progreso
+        $progressForm = New-Object System.Windows.Forms.Form
+        $progressForm.Text = "Instalando Software"
+        $progressForm.Size = New-Object System.Drawing.Size(500, 200)
+        $progressForm.StartPosition = "CenterScreen"
+        $progressForm.BackColor = [System.Drawing.Color]::FromArgb(25, 25, 35)
+        $progressForm.FormBorderStyle = [System.Windows.Forms.FormBorderStyle]::FixedDialog
+        
+        $progressLabel = Create-ProfessionalLabel -text "Instalando software..." -x 20 -y 20 -width 460
+        $progressForm.Controls.Add($progressLabel)
+        
+        $progressBar = New-Object System.Windows.Forms.ProgressBar
+        $progressBar.Location = New-Object System.Drawing.Point(20, 50)
+        $progressBar.Size = New-Object System.Drawing.Size(460, 20)
+        $progressBar.Style = [System.Windows.Forms.ProgressBarStyle]::Marquee
+        $progressForm.Controls.Add($progressBar)
+        
+        $statusLabel = Create-ProfessionalLabel -text "" -x 20 -y 80 -width 460
+        $progressForm.Controls.Add($statusLabel)
+        
+        $progressForm.Show()
+        
+        # Instalar software
+        $global:TotalSoftware = $selectedSoftware.Count
+        $global:InstalledSoftware = 0
+        
+        foreach ($software in $selectedSoftware) {
+            Install-Software -id $software.id -name $software.name -progressBar $progressBar -statusLabel $statusLabel
+            $global:InstalledSoftware++
+        }
+        
+        $progressForm.Close()
+        [System.Windows.Forms.MessageBox]::Show("Instalación completada. Software instalado: $global:InstalledSoftware de $global:TotalSoftware", "Instalación Completada", [System.Windows.Forms.MessageBoxButtons]::OK, [System.Windows.Forms.MessageBoxIcon]::Information)
+    }
+    $tabBasicSoftware.Controls.Add($installButton)
+    
+    $selectAllButton = Create-ProfessionalButton -text "Seleccionar Todo" -x 250 -y 520 -width 150 -height 30 -action {
+        foreach ($item in $global:allCheckboxes) {
+            $item.checkbox.Checked = $true
+        }
+    }
+    $tabBasicSoftware.Controls.Add($selectAllButton)
+    
+    $deselectAllButton = Create-ProfessionalButton -text "Deseleccionar Todo" -x 410 -y 520 -width 150 -height 30 -action {
+        foreach ($item in $global:allCheckboxes) {
+            $item.checkbox.Checked = $false
+        }
+    }
+    $tabBasicSoftware.Controls.Add($deselectAllButton)
 }
 
- $installBasicSoftwareButton = Create-StyledButton -text "Instalar Software Seleccionado" -x 20 -y 520 -width 200 -height 40 -action {
-    if (-not (Check-WingetInstalled)) {
-        Write-Host "Winget no está instalado. Intentando instalarlo automáticamente..."
-        if (-not (Install-Winget)) {
-            Write-Host "No se pudo instalar Winget. Intentando instalar Chocolatey..."
-            if (-not (Install-Chocolatey)) {
-                [System.Windows.Forms.MessageBox]::Show("No se pudo instalar ni Winget ni Chocolatey. Por favor, instale uno de ellos manualmente e intente nuevamente.", "Error de Instalación", [System.Windows.Forms.MessageBoxButtons]::OK, [System.Windows.Forms.MessageBoxIcon]::Error)
-                return
+# Poblar pestaña de Instaladores Personalizados
+function Populate-InstallersTab {
+    $tabInstallers.Controls.Clear()
+    
+    $titleLabel = Create-ProfessionalLabel -text "Gestor de Instaladores Personalizados" -x 20 -y 15 -font (New-Object System.Drawing.Font("Segoe UI", 12, [System.Drawing.FontStyle]::Bold))
+    $tabInstallers.Controls.Add($titleLabel)
+    
+    # Lista de instaladores
+    $installersList = New-Object System.Windows.Forms.ListBox
+    $installersList.Location = New-Object System.Drawing.Point(20, 50)
+    $installersList.Size = New-Object System.Drawing.Size(940, 200)
+    $installersList.BackColor = [System.Drawing.Color]::FromArgb(45, 45, 55)
+    $installersList.ForeColor = [System.Drawing.Color]::White
+    $installersList.SelectionMode = [System.Windows.Forms.SelectionMode]::MultiExtended
+    $tabInstallers.Controls.Add($installersList)
+    
+    # Botón de refresco
+    $refreshButton = Create-ProfessionalButton -text "Actualizar Lista" -x 20 -y 260 -width 150 -height 30 -action {
+        $installers = Initialize-Installers
+        $installersList.Items.Clear()
+        if ($installers) {
+            foreach ($instalador in $installers) {
+                $installersList.Items.Add($instalador.Name)
             }
         }
     }
+    $tabInstallers.Controls.Add($refreshButton)
     
-    $selectedSoftware = $global:allCheckboxes | Where-Object { $_.checkbox.Checked }
+    # Carpeta de descarga
+    $downloadFolderLabel = Create-ProfessionalLabel -text "Carpeta de Descarga:" -x 200 -y 260
+    $tabInstallers.Controls.Add($downloadFolderLabel)
     
-    if ($selectedSoftware.Count -eq 0) {
-        [System.Windows.Forms.MessageBox]::Show("Por favor, seleccione al menos un software para instalar.", "Sin Selección", [System.Windows.Forms.MessageBoxButtons]::OK, [System.Windows.Forms.MessageBoxIcon]::Warning)
-        return
-    }
+    $downloadFolderTextBox = New-Object System.Windows.Forms.TextBox
+    $downloadFolderTextBox.Location = New-Object System.Drawing.Point(320, 260)
+    $downloadFolderTextBox.Size = New-Object System.Drawing.Size(300, 23)
+    $downloadFolderTextBox.Text = [Environment]::GetFolderPath("Desktop")
+    $downloadFolderTextBox.BackColor = [System.Drawing.Color]::FromArgb(60, 60, 70)
+    $downloadFolderTextBox.ForeColor = [System.Drawing.Color]::White
+    $tabInstallers.Controls.Add($downloadFolderTextBox)
     
-    $progressBar.Value = 0
-    $progressBar.Maximum = $selectedSoftware.Count
-    $progressBar.Visible = $true
-    
-    foreach ($software in $selectedSoftware) {
-        Install-Software -id $software.id -name $software.name
-        $progressBar.Value += 1
-    }
-    
-    $progressBar.Visible = $false
-    [System.Windows.Forms.MessageBox]::Show("Instalación del software seleccionado completada.", "Instalación Completa", [System.Windows.Forms.MessageBoxButtons]::OK, [System.Windows.Forms.MessageBoxIcon]::Information)
-}
- $tabBasicSoftware.Controls.Add($installBasicSoftwareButton)
-
- $selectAllButton = Create-StyledButton -text "Seleccionar Todo" -x 240 -y 520 -width 150 -height 30 -action {
-    foreach ($item in $global:allCheckboxes) {
-        $item.checkbox.Checked = $true
-    }
-}
- $tabBasicSoftware.Controls.Add($selectAllButton)
-
- $deselectAllButton = Create-StyledButton -text "Deseleccionar Todo" -x 400 -y 520 -width 150 -height 30 -action {
-    foreach ($item in $global:allCheckboxes) {
-        $item.checkbox.Checked = $false
-    }
-}
- $tabBasicSoftware.Controls.Add($deselectAllButton)
-
- $progressBar = New-Object System.Windows.Forms.ProgressBar
- $progressBar.Location = New-Object System.Drawing.Point(560, 520)
- $progressBar.Size = New-Object System.Drawing.Size(200, 20)
- $progressBar.Visible = $false
- $tabBasicSoftware.Controls.Add($progressBar)
-
-# Poblar pestaña de Instaladores
- $installersList = New-Object System.Windows.Forms.CheckedListBox
- $installersList.Location = New-Object System.Drawing.Point(20, 50)
- $installersList.Size = New-Object System.Drawing.Size(800, 300)
- $installersList.BackColor = [System.Drawing.Color]::FromArgb(45, 45, 45)
- $installersList.ForeColor = [System.Drawing.Color]::White
- $tabInstallers.Controls.Add($installersList)
-
- $refreshButton = Create-StyledButton -text "Actualizar Lista" -x 20 -y 360 -width 150 -height 30 -action {
-    $instaladores = Initialize-Installers
-    if ($instaladores) {
-        $installersList.Items.Clear()
-        foreach ($instalador in $instaladores) {
-            $installersList.Items.Add($instalador.Name)
+    $selectFolderButton = Create-ProfessionalButton -text "Examinar..." -x 630 -y 260 -width 100 -height 23 -action {
+        $folderBrowser = New-Object System.Windows.Forms.FolderBrowserDialog
+        $folderBrowser.Description = "Seleccionar carpeta de descarga"
+        $folderBrowser.SelectedPath = $downloadFolderTextBox.Text
+        
+        if ($folderBrowser.ShowDialog() -eq [System.Windows.Forms.DialogResult]::OK) {
+            $downloadFolderTextBox.Text = $folderBrowser.SelectedPath
         }
     }
-}
- $tabInstallers.Controls.Add($refreshButton)
-
- $downloadFolderLabel = Create-StyledLabel -text "Carpeta de Descarga:" -x 200 -y 360
- $tabInstallers.Controls.Add($downloadFolderLabel)
-
- $downloadFolderTextBox = New-Object System.Windows.Forms.TextBox
- $downloadFolderTextBox.Location = New-Object System.Drawing.Point(320, 360)
- $downloadFolderTextBox.Size = New-Object System.Drawing.Size(300, 20)
- $downloadFolderTextBox.Text = [Environment]::GetFolderPath("Desktop")
- $downloadFolderTextBox.BackColor = [System.Drawing.Color]::FromArgb(60, 60, 60)
- $downloadFolderTextBox.ForeColor = [System.Drawing.Color]::White
- $tabInstallers.Controls.Add($downloadFolderTextBox)
-
- $selectFolderButton = Create-StyledButton -text "Examinar..." -x 630 -y 360 -width 100 -height 20 -action {
-    $folderBrowser = New-Object System.Windows.Forms.FolderBrowserDialog
-    $folderBrowser.Description = "Seleccionar carpeta de descarga"
-    $folderBrowser.SelectedPath = $downloadFolderTextBox.Text
+    $tabInstallers.Controls.Add($selectFolderButton)
     
-    if ($folderBrowser.ShowDialog() -eq [System.Windows.Forms.DialogResult]::OK) {
-        $downloadFolderTextBox.Text = $folderBrowser.SelectedPath
-    }
-}
- $tabInstallers.Controls.Add($selectFolderButton)
-
- $installCustomInstallersButton = Create-StyledButton -text "Instalar Seleccionados" -x 200 -y 390 -width 200 -height 40 -action {
-    $selectedIndices = $installersList.CheckedIndices
-    if ($selectedIndices.Count -eq 0) {
-        [System.Windows.Forms.MessageBox]::Show("Por favor, seleccione al menos un instalador.", "Sin Selección", [System.Windows.Forms.MessageBoxButtons]::OK, [System.Windows.Forms.MessageBoxIcon]::Warning)
-        return
-    }
-    
-    $downloadPath = $downloadFolderTextBox.Text
-    if (-not (Test-Path $downloadPath)) {
-        [System.Windows.Forms.MessageBox]::Show("La carpeta de destino no existe. Por favor, seleccione una carpeta válida.", "Carpeta Inválida", [System.Windows.Forms.MessageBoxButtons]::OK, [System.Windows.Forms.MessageBoxIcon]::Error)
-        return
-    }
-    
-    $installersProgressBar.Value = 0
-    $installersProgressBar.Maximum = $selectedIndices.Count
-    $installersProgressBar.Visible = $true
-    
-    $scriptRoot = if ($PSScriptRoot) { $PSScriptRoot } else { $PWD.Path }
-    $instaladoresPath = Join-Path -Path $scriptRoot -ChildPath "instaladores"
-    $instaladores = Get-ChildItem -Path $instaladoresPath -Filter "*.exe" -ErrorAction SilentlyContinue
-    
-    foreach ($index in $selectedIndices) {
-        $installerName = $installersList.Items[$index].ToString()
-        $installer = $instaladores | Where-Object { $_.Name -eq $installerName } | Select-Object -First 1
+    # Botón de instalación
+    $installButton = Create-ProfessionalButton -text "Instalar Seleccionados" -x 200 -y 300 -width 220 -height 40 -action {
+        $selectedIndices = $installersList.SelectedIndices
+        if ($selectedIndices.Count -eq 0) {
+            [System.Windows.Forms.MessageBox]::Show("Por favor, seleccione al menos un instalador.", "Sin Selección", [System.Windows.Forms.MessageBoxButtons]::OK, [System.Windows.Forms.MessageBoxIcon]::Warning)
+            return
+        }
         
-        if ($installer) {
-            try {
+        $downloadPath = $downloadFolderTextBox.Text
+        if (-not (Test-Path $downloadPath)) {
+            [System.Windows.Forms.MessageBox]::Show("La carpeta de destino no existe.", "Error", [System.Windows.Forms.MessageBoxButtons]::OK, [System.Windows.Forms.MessageBoxIcon]::Error)
+            return
+        }
+        
+        $installers = Initialize-Installers
+        if (-not $installers) {
+            [System.Windows.Forms.MessageBox]::Show("No se encontraron instaladores.", "Error", [System.Windows.Forms.MessageBoxButtons]::OK, [System.Windows.Forms.MessageBoxIcon]::Error)
+            return
+        }
+        
+        # Crear formulario de progreso
+        $progressForm = New-Object System.Windows.Forms.Form
+        $progressForm.Text = "Instalando Programas"
+        $progressForm.Size = New-Object System.Drawing.Size(500, 150)
+        $progressForm.StartPosition = "CenterScreen"
+        $progressForm.BackColor = [System.Drawing.Color]::FromArgb(25, 25, 35)
+        $progressForm.FormBorderStyle = [System.Windows.Forms.FormBorderStyle]::FixedDialog
+        
+        $progressLabel = Create-ProfessionalLabel -text "Instalando programas..." -x 20 -y 20 -width 460
+        $progressForm.Controls.Add($progressLabel)
+        
+        $progressBar = New-Object System.Windows.Forms.ProgressBar
+        $progressBar.Location = New-Object System.Drawing.Point(20, 50)
+        $progressBar.Size = New-Object System.Drawing.Size(460, 20)
+        $progressBar.Style = [System.Windows.Forms.ProgressBarStyle]::Marquee
+        $progressForm.Controls.Add($progressBar)
+        
+        $statusLabel = Create-ProfessionalLabel -text "" -x 20 -y 80 -width 460
+        $progressForm.Controls.Add($statusLabel)
+        
+        $progressForm.Show()
+        
+        foreach ($index in $selectedIndices) {
+            $installerName = $installersList.Items[$index].ToString()
+            $installer = $installers | Where-Object { $_.Name -eq $installerName } | Select-Object -First 1
+            
+            if ($installer) {
                 $destinationPath = Join-Path $downloadPath $installer.Name
                 Copy-Item -Path $installer.FullName -Destination $destinationPath -Force
                 
-                # Usar WaitForExit para mejor control
-                $process = Start-Process -FilePath $destinationPath -ArgumentList "/S", "/quiet", "/norestart" -PassThru
-                $process.WaitForExit()
-                
-                if ($process.ExitCode -eq 0) {
-                    [System.Windows.Forms.MessageBox]::Show("Instalación de $($installer.Name) completada.", "Éxito", [System.Windows.Forms.MessageBoxButtons]::OK, [System.Windows.Forms.MessageBoxIcon]::Information)
-                } else {
-                    [System.Windows.Forms.MessageBox]::Show("Error al instalar $($installer.Name). Código de salida: $($process.ExitCode)", "Error", [System.Windows.Forms.MessageBoxButtons]::OK, [System.Windows.Forms.MessageBoxIcon]::Error)
-                }
-            } catch {
-                $errorMessage = $_.Exception.Message
-                $message = "Error al instalar $($installer.Name): " + $errorMessage
-                [System.Windows.Forms.MessageBox]::Show($message, "Error", [System.Windows.Forms.MessageBoxButtons]::OK, [System.Windows.Forms.MessageBoxIcon]::Error)
+                Download-And-Install -url $installer.FullName -fileName $installer.Name -downloadPath $downloadPath -progressBar $progressBar -statusLabel $statusLabel
             }
-        } else {
-            [System.Windows.Forms.MessageBox]::Show("No se pudo encontrar el instalador: $installerName", "Error", [System.Windows.Forms.MessageBoxButtons]::OK, [System.Windows.Forms.MessageBoxIcon]::Error)
         }
-        $installersProgressBar.Value += 1
+        
+        $progressForm.Close()
+        [System.Windows.Forms.MessageBox]::Show("Instalación completada.", "Instalación Completada", [System.Windows.Forms.MessageBoxButtons]::OK, [System.Windows.Forms.MessageBoxIcon]::Information)
     }
+    $tabInstallers.Controls.Add($installButton)
     
-    $installersProgressBar.Visible = $false
-    [System.Windows.Forms.MessageBox]::Show("Proceso de instalación completado.", "Instalación Completa", [System.Windows.Forms.MessageBoxButtons]::OK, [System.Windows.Forms.MessageBoxIcon]::Information)
+    # Botón de descarga desde GitHub
+    $downloadFromGitHubButton = Create-ProfessionalButton -text "Descargar desde GitHub" -x 440 -y 300 -width 180 -height 40 -action {
+        $folderBrowser = New-Object System.Windows.Forms.FolderBrowserDialog
+        $folderBrowser.Description = "Seleccionar carpeta para guardar instaladores"
+        $folderBrowser.SelectedPath = [Environment]::GetFolderPath("Desktop")
+        
+        if ($folderBrowser.ShowDialog() -eq [System.Windows.Forms.DialogResult]::OK) {
+            Download-InstallersFromGitHub -destinationPath $folderBrowser.SelectedPath
+        }
+    }
+    $tabInstallers.Controls.Add($downloadFromGitHubButton)
 }
- $tabInstallers.Controls.Add($installCustomInstallersButton)
 
- $installersProgressBar = New-Object System.Windows.Forms.ProgressBar
- $installersProgressBar.Location = New-Object System.Drawing.Point(200, 440)
- $installersProgressBar.Size = New-Object System.Drawing.Size(600, 20)
- $installersProgressBar.Visible = $false
- $tabInstallers.Controls.Add($installersProgressBar)
-
-# Poblar pestaña de Activaciones y Optimizaciones
- $activationsLabel = Create-StyledLabel -text "Activaciones y Optimizaciones del Sistema:" -x 20 -y 20
- $tabActivations.Controls.Add($activationsLabel)
-
- $activateButton = Create-StyledButton -text "Activar Windows y Office" -x 20 -y 60 -width 200 -height 40 -action {
-    Activate-WindowsAndOffice
+# Poblar pestaña de Activaciones y Optimización
+function Populate-ActivationsTab {
+    $tabActivations.Controls.Clear()
+    
+    $titleLabel = Create-ProfessionalLabel -text "Activaciones y Optimización del Sistema" -x 20 -y 15 -font (New-Object System.Drawing.Font("Segoe UI", 12, [System.Drawing.FontStyle]::Bold))
+    $tabActivations.Controls.Add($titleLabel)
+    
+    # Botones de activación
+    $activateButton = Create-ProfessionalButton -text "Activar Windows y Office" -x 30 -y 60 -width 200 -height 40 -action {
+        Activate-WindowsAndOffice
+    }
+    $tabActivations.Controls.Add($activateButton)
+    
+    $activatedWinButton = Create-ProfessionalButton -text "Ejecutar Script Activated.Win" -x 30 -y 110 -width 200 -height 40 -action {
+        Run-ActivatedWin
+    }
+    $tabActivations.Controls.Add($activatedWinButton)
+    
+    $chrisTitusButton = Create-ProfessionalButton -text "Ejecutar Script de Chris Titus" -x 30 -y 160 -width 200 -height 40 -action {
+        Run-ChrisTitusScript
+    }
+    $tabActivations.Controls.Add($chrisTitusButton)
+    
+    # Botones de optimización
+    $optimizeNetworkButton = Create-ProfessionalButton -text "Optimizar Red" -x 250 -y 60 -width 200 -height 40 -action {
+        Optimize-Network
+    }
+    $tabActivations.Controls.Add($optimizeNetworkButton)
+    
+    $optimizeSystemButton = Create-ProfessionalButton -text "Optimizar Sistema" -x 250 -y 110 -width 200 -height 40 -action {
+        Optimize-System
+    }
+    $tabActivations.Controls.Add($optimizeSystemButton)
+    
+    $cleanTempButton = Create-ProfessionalButton -text "Limpiar Archivos Temporales" -x 250 -y 160 -width 200 -height 40 -action {
+        Clean-TempFiles
+    }
+    $tabActivations.Controls.Add($cleanTempButton)
+    
+    $createRestorePointButton = Create-ProfessionalButton -text "Crear Punto de Restauración" -x 250 -y 210 -width 200 -height 40 -action {
+        Create-RestorePoint
+    }
+    $tabActivations.Controls.Add($createRestorePointButton)
+    
+    # Información del sistema
+    $systemInfoLabel = Create-ProfessionalLabel -text "Información del Sistema" -x 470 -y 60 -font (New-Object System.Drawing.Font("Segoe UI", 11, [System.Drawing.FontStyle]::Bold))
+    $tabActivations.Controls.Add($systemInfoLabel)
+    
+    $osInfo = Get-CimInstance Win32_OperatingSystem
+    $processorInfo = Get-CimInstance Win32_Processor
+    
+    $infoText = @"
+Sistema Operativo: $($osInfo.Caption)
+Versión: $($osInfo.Version)
+Arquitectura: $($osInfo.OSArchitecture)
+Procesador: $($processorInfo.Name)
+Memoria RAM: $([math]::Round($osInfo.TotalVisibleMemorySize / 1MB)) GB
+Disco Duro: $([math]::Round((Get-PSDrive C).Used / 1GB)) GB / $([math]::Round((Get-PSDrive C).Free / 1GB)) GB libres
+"@
+    
+    $infoLabel = Create-ProfessionalLabel -text $infoText -x 470 -y 90 -width 480 -height 150
+    $tabActivations.Controls.Add($infoLabel)
 }
- $tabActivations.Controls.Add($activateButton)
 
- $activatedWinButton = Create-StyledButton -text "Ejecutar Script Activated.Win" -x 20 -y 110 -width 200 -height 40 -action {
-    Run-ActivatedWin
-    [System.Windows.Forms.MessageBox]::Show("Script de Activated.Win ejecutado.", "Ejecución de Script", [System.Windows.Forms.MessageBoxButtons]::OK, [System.Windows.Forms.MessageBoxIcon]::Information)
+# Poblar pestaña de Configuración
+function Populate-SettingsTab {
+    $tabSettings.Controls.Clear()
+    
+    $titleLabel = Create-ProfessionalLabel -text "Configuración del Sistema" -x 20 -y 15 -font (New-Object System.Drawing.Font("Segoe UI", 12, [System.Drawing.FontStyle]::Bold))
+    $tabSettings.Controls.Add($titleLabel)
+    
+    # Configuración de winget
+    $wingetLabel = Create-ProfessionalLabel -text "Configuración de Winget:" -x 30 -y 50 -font (New-Object System.Drawing.Font("Segoe UI", 10, [System.Drawing.FontStyle]::Bold))
+    $tabSettings.Controls.Add($wingetLabel)
+    
+    $wingetStatus = if (Test-Winget) { "Instalado" } else { "No Instalado" }
+    $wingetStatusLabel = Create-ProfessionalLabel -text "Estado: $wingetStatus" -x 30 -y 75
+    $tabSettings.Controls.Add($wingetStatusLabel)
+    
+    $installWingetButton = Create-ProfessionalButton -text "Instalar Winget" -x 30 -y 100 -width 150 -height 30 -action {
+        Install-Winget
+        $wingetStatusLabel.Text = "Estado: Instalado"
+    }
+    $tabSettings.Controls.Add($installWingetButton)
+    
+    # Configuración de Chocolatey
+    $chocoLabel = Create-ProfessionalLabel -text "Configuración de Chocolatey:" -x 30 -y 140 -font (New-Object System.Drawing.Font("Segoe UI", 10, [System.Drawing.FontStyle]::Bold))
+    $tabSettings.Controls.Add($chocoLabel)
+    
+    $chocoStatus = if (Test-Chocolatey) { "Instalado" } else { "No Instalado" }
+    $chocoStatusLabel = Create-ProfessionalLabel -text "Estado: $chocoStatus" -x 30 -y 165
+    $tabSettings.Controls.Add($chocoStatusLabel)
+    
+    $installChocoButton = Create-ProfessionalButton -text "Instalar Chocolatey" -x 30 -y 190 -width 150 -height 30 -action {
+        Install-Chocolatey
+        $chocoStatusLabel.Text = "Estado: Instalado"
+    }
+    $tabSettings.Controls.Add($installChocoButton)
+    
+    # Limpiar caché
+    $clearCacheButton = Create-ProfessionalButton -text "Limpiar Caché" -x 30 -y 240 -width 150 -height 30 -action {
+        try {
+            if (Test-Winget) {
+                winget cache reset
+                [System.Windows.Forms.MessageBox]::Show("Caché de Winget limpiado.", "Limpieza", [System.Windows.Forms.MessageBoxButtons]::OK, [System.Windows.Forms.MessageBoxIcon]::Information)
+            }
+            else {
+                [System.Windows.Forms.MessageBox]::Show("Winget no está instalado.", "Error", [System.Windows.Forms.MessageBoxButtons]::OK, [System.Windows.Forms.MessageBoxIcon]::Warning)
+            }
+        }
+        catch {
+            [System.Windows.Forms.MessageBox]::Show("Error: $($_.Exception.Message)", "Error", [System.Windows.Forms.MessageBoxButtons]::OK, [System.Windows.Forms.MessageBoxIcon]::Error)
+        }
+    }
+    $tabSettings.Controls.Add($clearCacheButton)
+    
+    # Actualizar Shadowiex
+    $updateLabel = Create-ProfessionalLabel -text "Actualizar Shadowiex:" -x 30 -y 290 -font (New-Object System.Drawing.Font("Segoe UI", 10, [System.Drawing.FontStyle]::Bold))
+    $tabSettings.Controls.Add($updateLabel)
+    
+    $updateButton = Create-ProfessionalButton -text "Actualizar desde GitHub" -x 30 -y 315 -width 150 -height 30 -action {
+        try {
+            $updateUrl = "https://github.com/WalterShadow2001/shadowiex/raw/main/Shadowiex.ps1"
+            $tempFile = "$env:TEMP\Shadowiex.ps1"
+            
+            Invoke-WebRequest -Uri $updateUrl -OutFile $tempFile -ErrorAction Stop
+            Copy-Item -Path $tempFile -Destination $PSCommandPath -Force
+            
+            [System.Windows.Forms.MessageBox]::Show("Shadowiex actualizado. Reinicie el programa.", "Actualización", [System.Windows.Forms.MessageBoxButtons]::OK, [System.Windows.Forms.MessageBoxIcon]::Information)
+            $form.Close()
+        }
+        catch {
+            [System.Windows.Forms.MessageBox]::Show("Error al actualizar: $($_.Exception.Message)", "Error", [System.Windows.Forms.MessageBoxButtons]::OK, [System.Windows.Forms.MessageBoxIcon]::Error)
+        }
+    }
+    $tabSettings.Controls.Add($updateButton)
 }
- $tabActivations.Controls.Add($activatedWinButton)
 
- $chrisTitusButton = Create-StyledButton -text "Ejecutar Script de Chris Titus" -x 20 -y 160 -width 200 -height 40 -action {
-    Run-ChrisTitusScript
-    [System.Windows.Forms.MessageBox]::Show("Script de Chris Titus ejecutado.", "Ejecución de Script", [System.Windows.Forms.MessageBoxButtons]::OK, [System.Windows.Forms.MessageBoxIcon]::Information)
-}
- $tabActivations.Controls.Add($chrisTitusButton)
+# Poblar todas las pestañas
+Populate-SoftwareTab
+Populate-InstallersTab
+Populate-ActivationsTab
+Populate-SettingsTab
 
- $optimizeNetworkButton = Create-StyledButton -text "Optimizar Red" -x 240 -y 60 -width 200 -height 40 -action {
-    Optimize-Network
-    [System.Windows.Forms.MessageBox]::Show("Optimización de red completada.", "Optimización", [System.Windows.Forms.MessageBoxButtons]::OK, [System.Windows.Forms.MessageBoxIcon]::Information)
-}
- $tabActivations.Controls.Add($optimizeNetworkButton)
-
- $optimizeSystemButton = Create-StyledButton -text "Optimizar Sistema" -x 240 -y 110 -width 200 -height 40 -action {
-    Optimize-System
-    [System.Windows.Forms.MessageBox]::Show("Optimización del sistema completada.", "Optimización", [System.Windows.Forms.MessageBoxButtons]::OK, [System.Windows.Forms.MessageBoxIcon]::Information)
-}
- $tabActivations.Controls.Add($optimizeSystemButton)
-
- $cleanTempButton = Create-StyledButton -text "Limpiar Archivos Temporales" -x 240 -y 160 -width 200 -height 40 -action {
-    Clean-TempFiles
-    [System.Windows.Forms.MessageBox]::Show("Archivos temporales limpiados.", "Limpieza", [System.Windows.Forms.MessageBoxButtons]::OK, [System.Windows.Forms.MessageBoxIcon]::Information)
-}
- $tabActivations.Controls.Add($cleanTempButton)
-
- $createRestorePointButton = Create-StyledButton -text "Crear Punto de Restauración" -x 240 -y 210 -width 200 -height 40 -action {
-    Create-RestorePoint
-    [System.Windows.Forms.MessageBox]::Show("Punto de restauración creado.", "Protección del Sistema", [System.Windows.Forms.MessageBoxButtons]::OK, [System.Windows.Forms.MessageBoxIcon]::Information)
-}
- $tabActivations.Controls.Add($createRestorePointButton)
+# Evento de carga del formulario
+ $form.Add_Shown({$form.Activate()})
 
 # Mostrar el formulario
- $form.Add_Shown({$form.Activate()})
 [void]$form.ShowDialog()
