@@ -5,7 +5,7 @@
     Una herramienta completa para instalar software, optimizar el sistema y gestionar activaciones de Windows y Office con interfaz profesional.
 .NOTES
     Autor: WalterShadow2001
-    Versión: 3.3 - Professional Edition (Corregido)
+    Versión: 3.4 - Professional Edition (Corregido)
     Requiere: PowerShell 5.1 o superior, privilegios de administrador
 #>
 
@@ -89,7 +89,7 @@ class InstallationState {
 
 # Añadir pestañas al control
  $tabControl.Controls.Add($tabBasicSoftware)
- $tabControl.Controls.Add($tabInstallers)
+ $tabControl.Controls.Add($installers)
  $tabControl.Controls.Add($tabActivations)
  $tabControl.Controls.Add($tabSettings)
 
@@ -219,7 +219,7 @@ function Install-Chocolatey {
     }
 }
 
-# Función para instalar software (CORREGIDA - sin interpolación de $_)
+# Función para instalar software (CORREGIDA - sin interpolación de variables problemáticas)
 function Install-Software {
     param (
         [string]$id,
@@ -264,16 +264,15 @@ function Install-Software {
                 return $true
             }
             else {
-                # CORRECCIÓN: Usar $Error[0] en lugar de $_
-                $errorMessage = $Error[0].Exception.Message
-                $statusLabel.Text = "Error al instalar $name: " + $errorMessage
+                # CORRECCIÓN: Usar concatenación simple sin variables problemáticas
+                $errorMessage = "Error al instalar $name"
+                $statusLabel.Text = $errorMessage
                 return $false
             }
         }
         catch {
-            # CORRECCIÓN: Usar $Error[0] en lugar de $_
-            $errorMessage = $Error[0].Exception.Message
-            $statusLabel.Text = "Error al instalar $name: " + $errorMessage
+            # CORRECCIÓN: Usar mensaje de error genérico
+            $statusLabel.Text = "Error al instalar $name"
             return $false
         }
     }
@@ -317,7 +316,7 @@ function Download-And-Install {
         }
     }
     catch {
-        $statusLabel.Text = "Error: " + $Error[0].Exception.Message
+        $statusLabel.Text = "Error en la instalación"
         return $false
     }
 }
