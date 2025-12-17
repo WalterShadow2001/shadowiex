@@ -5,7 +5,7 @@
     Una herramienta completa para instalar software, optimizar el sistema y gestionar activaciones de Windows y Office.
 .NOTES
     Autor: WalterShadow2001
-    Versión: 2.1
+    Versión: 2.2
     Requiere: PowerShell 5.1 o superior, privilegios de administrador
 #>
 
@@ -146,7 +146,7 @@ function Install-Winget {
         }
     }
     catch {
-        Write-Host "Error al instalar Winget: $_"
+        Write-Host "Error al instalar Winget: $($_.Exception.Message)"
         return $false
     }
 }
@@ -169,7 +169,7 @@ function Install-Chocolatey {
         }
     }
     catch {
-        Write-Host "Error al instalar Chocolatey: $_"
+        Write-Host "Error al instalar Chocolatey: $($_.Exception.Message)"
         return $false
     }
 }
@@ -243,7 +243,7 @@ function Download-And-Install {
         }
     }
     catch {
-        Write-Host "Error al descargar o instalar $fileName: $_"
+        Write-Host "Error al descargar o instalar $fileName: $($_.Exception.Message)"
         return $false
     }
 }
@@ -348,7 +348,7 @@ function Activate-WindowsAndOffice {
                 Write-Host "Script de activación TSforge descargado correctamente."
             }
         } catch {
-            Write-Host "Error al descargar el script de activación: $_"
+            Write-Host "Error al descargar el script de activación: $($_.Exception.Message)"
             return
         }
     }
@@ -370,7 +370,7 @@ function Activate-WindowsAndOffice {
             Write-Host "Activación completada."
         }
     } catch {
-        Write-Host "Error al ejecutar el script de activación: $_"
+        Write-Host "Error al ejecutar el script de activación: $($_.Exception.Message)"
     }
 }
 
@@ -381,7 +381,7 @@ function Run-ActivatedWin {
         Write-Host "Script de activated.win ejecutado correctamente."
     }
     catch {
-        Write-Host "Error al ejecutar el script de activated.win. Error: $_"
+        Write-Host "Error al ejecutar el script de activated.win: $($_.Exception.Message)"
     }
 }
 
@@ -392,7 +392,7 @@ function Run-ChrisTitusScript {
         Write-Host "Script de Chris Titus ejecutado correctamente."
     }
     catch {
-        Write-Host "Error al ejecutar el script de Chris Titus. Error: $_"
+        Write-Host "Error al ejecutar el script de Chris Titus: $($_.Exception.Message)"
     }
 }
 
@@ -453,7 +453,7 @@ function Download-InstallersFromGitHub {
         
         Write-Host "Descarga de instaladores completada."
     } catch {
-        Write-Host "Error al descargar instaladores desde GitHub: $_"
+        Write-Host "Error al descargar instaladores desde GitHub: $($_.Exception.Message)"
     }
 }
 
@@ -673,7 +673,7 @@ foreach ($category in $softwareCategories.Keys) {
                     [System.Windows.Forms.MessageBox]::Show("Error al instalar $($installer.Name). Código de salida: $($process.ExitCode)", "Error", [System.Windows.Forms.MessageBoxButtons]::OK, [System.Windows.Forms.MessageBoxIcon]::Error)
                 }
             } catch {
-                [System.Windows.Forms.MessageBox]::Show("Error al instalar $($installer.Name): $_", "Error", [System.Windows.Forms.MessageBoxButtons]::OK, [System.Windows.Forms.MessageBoxIcon]::Error)
+                [System.Windows.Forms.MessageBox]::Show("Error al instalar $($installer.Name): $($_.Exception.Message)", "Error", [System.Windows.Forms.MessageBoxButtons]::OK, [System.Windows.Forms.MessageBoxIcon]::Error)
             }
         } else {
             [System.Windows.Forms.MessageBox]::Show("No se pudo encontrar el instalador: $installerName", "Error", [System.Windows.Forms.MessageBoxButtons]::OK, [System.Windows.Forms.MessageBoxIcon]::Error)
