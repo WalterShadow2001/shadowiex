@@ -5,7 +5,7 @@
     Una herramienta completa para instalar software, optimizar el sistema y gestionar activaciones de Windows y Office.
 .NOTES
     Autor: WalterShadow2001
-    Versión: 2.6
+    Versión: 2.7
     Requiere: PowerShell 5.1 o superior, privilegios de administrador
 #>
 
@@ -146,7 +146,6 @@ function Install-Winget {
         }
     }
     catch {
-        # CORRECCIÓN: Usar comillas simples y concatenación para evitar problemas de análisis
         $errorMessage = $_.Exception.Message
         Write-Host "Error al instalar Winget: $errorMessage"
         return $false
@@ -171,7 +170,6 @@ function Install-Chocolatey {
         }
     }
     catch {
-        # CORRECCIÓN: Usar comillas simples y concatenación para evitar problemas de análisis
         $errorMessage = $_.Exception.Message
         Write-Host "Error al instalar Chocolatey: $errorMessage"
         return $false
@@ -218,7 +216,7 @@ function Install-Software {
     }
 }
 
-# Función para descargar e instalar instaladores personalizados (corregida definitivamente)
+# Función para descargar e instalar instaladores personalizados (CORREGIDA DEFINITIVAMENTE)
 function Download-And-Install {
     param (
         [string]$url,
@@ -247,7 +245,7 @@ function Download-And-Install {
         }
     }
     catch {
-        # CORRECCIÓN: Usar comillas simples y concatenación para evitar problemas de análisis
+        # CORRECCIÓN: Usar variable simple y concatenación directa
         $errorMessage = $_.Exception.Message
         Write-Host "Error al descargar o instalar $fileName: $errorMessage"
         return $false
@@ -354,7 +352,6 @@ function Activate-WindowsAndOffice {
                 Write-Host "Script de activación TSforge descargado correctamente."
             }
         } catch {
-            # CORRECCIÓN: Usar comillas simples y concatenación para evitar problemas de análisis
             $errorMessage = $_.Exception.Message
             Write-Host "Error al descargar el script de activación: $errorMessage"
             return
@@ -378,7 +375,6 @@ function Activate-WindowsAndOffice {
             Write-Host "Activación completada."
         }
     } catch {
-        # CORRECCIÓN: Usar comillas simples y concatenación para evitar problemas de análisis
         $errorMessage = $_.Exception.Message
         Write-Host "Error al ejecutar el script de activación: $errorMessage"
     }
@@ -391,7 +387,6 @@ function Run-ActivatedWin {
         Write-Host "Script de activated.win ejecutado correctamente."
     }
     catch {
-        # CORRECCIÓN: Usar comillas simples y concatenación para evitar problemas de análisis
         $errorMessage = $_.Exception.Message
         Write-Host "Error al ejecutar el script de activated.win: $errorMessage"
     }
@@ -404,7 +399,6 @@ function Run-ChrisTitusScript {
         Write-Host "Script de Chris Titus ejecutado correctamente."
     }
     catch {
-        # CORRECCIÓN: Usar comillas simples y concatenación para evitar problemas de análisis
         $errorMessage = $_.Exception.Message
         Write-Host "Error al ejecutar el script de Chris Titus: $errorMessage"
     }
@@ -467,7 +461,6 @@ function Download-InstallersFromGitHub {
         
         Write-Host "Descarga de instaladores completada."
     } catch {
-        # CORRECCIÓN: Usar comillas simples y concatenación para evitar problemas de análisis
         $errorMessage = $_.Exception.Message
         Write-Host "Error al descargar instaladores desde GitHub: $errorMessage"
     }
@@ -561,7 +554,7 @@ foreach ($category in $softwareCategories.Keys) {
         if (-not (Install-Winget)) {
             Write-Host "No se pudo instalar Winget. Intentando instalar Chocolatey..."
             if (-not (Install-Chocolatey)) {
-                [System.Windows.Forms.MessageBox]::Show("No se pudo instalar ni Winget ni Chocolatey. Por favor, instale uno de ellos manualmente e intente nuevamente.", "Error de Instalación", [System.Windows.Forms.MessageBoxButtons]::OK, [System.Windows.MessageBox.Icon]::Error)
+                [System.Windows.Forms.MessageBox]::Show("No se pudo instalar ni Winget ni Chocolatey. Por favor, instale uno de ellos manualmente e intente nuevamente.", "Error de Instalación", [System.Windows.Forms.MessageBoxButtons]::OK, [System.Windows.Forms.MessageBoxIcon]::Error)
                 return
             }
         }
@@ -689,7 +682,6 @@ foreach ($category in $softwareCategories.Keys) {
                     [System.Windows.Forms.MessageBox]::Show("Error al instalar $($installer.Name). Código de salida: $($process.ExitCode)", "Error", [System.Windows.Forms.MessageBoxButtons]::OK, [System.Windows.Forms.MessageBoxIcon]::Error)
                 }
             } catch {
-                # CORRECCIÓN: Usar comillas simples y concatenación para evitar problemas de análisis
                 $errorMessage = $_.Exception.Message
                 [System.Windows.Forms.MessageBox]::Show("Error al instalar $($installer.Name): $errorMessage", "Error", [System.Windows.Forms.MessageBoxButtons]::OK, [System.Windows.Forms.MessageBoxIcon]::Error)
             }
