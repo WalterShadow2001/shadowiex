@@ -5,7 +5,7 @@
     Una herramienta completa para instalar software, optimizar el sistema y gestionar activaciones de Windows y Office con interfaz profesional.
 .NOTES
     Autor: WalterShadow2001
-    Versión: 3.2 - Professional Edition (Corregido)
+    Versión: 3.3 - Professional Edition (Corregido)
     Requiere: PowerShell 5.1 o superior, privilegios de administrador
 #>
 
@@ -264,15 +264,15 @@ function Install-Software {
                 return $true
             }
             else {
-                # CORRECCIÓN: Usar concatenación en lugar de interpolación
-                $errorMessage = $_.Exception.Message
+                # CORRECCIÓN: Usar $Error[0] en lugar de $_
+                $errorMessage = $Error[0].Exception.Message
                 $statusLabel.Text = "Error al instalar $name: " + $errorMessage
                 return $false
             }
         }
         catch {
-            # CORRECCIÓN: Usar concatenación en lugar de interpolación
-            $errorMessage = $_.Exception.Message
+            # CORRECCIÓN: Usar $Error[0] en lugar de $_
+            $errorMessage = $Error[0].Exception.Message
             $statusLabel.Text = "Error al instalar $name: " + $errorMessage
             return $false
         }
@@ -317,7 +317,7 @@ function Download-And-Install {
         }
     }
     catch {
-        $statusLabel.Text = "Error: " + $_.Exception.Message
+        $statusLabel.Text = "Error: " + $Error[0].Exception.Message
         return $false
     }
 }
