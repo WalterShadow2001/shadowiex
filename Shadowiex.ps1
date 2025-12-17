@@ -5,7 +5,7 @@
     Una herramienta completa para instalar software, optimizar el sistema y gestionar activaciones de Windows y Office con interfaz profesional.
 .NOTES
     Autor: WalterShadow2001
-    Versión: 3.0 - Professional Edition
+    Versión: 3.1 - Professional Edition (Corregido)
     Requiere: PowerShell 5.1 o superior, privilegios de administrador
 #>
 
@@ -219,7 +219,7 @@ function Install-Chocolatey {
     }
 }
 
-# Función para instalar software (optimizada con progreso)
+# Función para instalar software (CORREGIDA - sin interpolación de $_)
 function Install-Software {
     param (
         [string]$id,
@@ -264,12 +264,16 @@ function Install-Software {
                 return $true
             }
             else {
-                $statusLabel.Text = "Error al instalar $name con Chocolatey."
+                # CORRECCIÓN: Usar concatenación en lugar de interpolación
+                $errorMessage = $_.Exception.Message
+                $statusLabel.Text = "Error al instalar $name: " + $errorMessage
                 return $false
             }
         }
         catch {
-            $statusLabel.Text = "Error al instalar $name: $($_.Exception.Message)"
+            # CORRECCIÓN: Usar concatenación en lugar de interpolación
+            $errorMessage = $_.Exception.Message
+            $statusLabel.Text = "Error al instalar $name: " + $errorMessage
             return $false
         }
     }
@@ -313,7 +317,7 @@ function Download-And-Install {
         }
     }
     catch {
-        $statusLabel.Text = "Error: $($_.Exception.Message)"
+        $statusLabel.Text = "Error: " + $_.Exception.Message
         return $false
     }
 }
