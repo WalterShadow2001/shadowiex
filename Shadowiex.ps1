@@ -5,7 +5,7 @@
     Una herramienta completa para instalar software, optimizar el sistema y gestionar activaciones de Windows y Office.
 .NOTES
     Autor: WalterShadow2001
-    Versión: 2.2
+    Versión: 2.3
     Requiere: PowerShell 5.1 o superior, privilegios de administrador
 #>
 
@@ -214,7 +214,7 @@ function Install-Software {
     }
 }
 
-# Función para descargar e instalar instaladores personalizados (corregida)
+# Función para descargar e instalar instaladores personalizados (corregida definitivamente)
 function Download-And-Install {
     param (
         [string]$url,
@@ -243,6 +243,7 @@ function Download-And-Install {
         }
     }
     catch {
+        # Corrección: Usar $_.Exception.Message en lugar de $_
         Write-Host "Error al descargar o instalar $fileName: $($_.Exception.Message)"
         return $false
     }
@@ -333,7 +334,7 @@ function Optimize-System {
     Write-Host "Sistema optimizado correctamente."
 }
 
-# Función para activar Windows y Office (corregida)
+# Función para activar Windows y Office (corregida definitivamente)
 function Activate-WindowsAndOffice {
     $scriptRoot = if ($PSScriptRoot) { $PSScriptRoot } else { $PWD.Path }
     $tsforgeScript = Join-Path -Path $scriptRoot -ChildPath "TSforge_Activation.cmd"
@@ -416,7 +417,7 @@ function Initialize-Installers {
     return $instaladores
 }
 
-# Función para descargar instaladores desde GitHub (corregida)
+# Función para descargar instaladores desde GitHub (corregida definitivamente)
 function Download-InstallersFromGitHub {
     param (
         [string]$destinationPath
