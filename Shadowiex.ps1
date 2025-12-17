@@ -5,7 +5,7 @@
     Una herramienta completa para instalar software, optimizar el sistema y gestionar activaciones de Windows y Office con interfaz profesional.
 .NOTES
     Autor: WalterShadow2001
-    Versión: 3.4 - Professional Edition (Corregido)
+    Versión: 3.5 - Professional Edition (Corregido)
     Requiere: PowerShell 5.1 o superior, privilegios de administrador
 #>
 
@@ -58,7 +58,9 @@ class InstallationState {
  $form.StartPosition = "CenterScreen"
  $form.BackColor = [System.Drawing.Color]::FromArgb(25, 25, 35)
  $form.ForeColor = [System.Drawing.Color]::White
- $form.Icon = [System.Drawing.Icon]::ExtractAssociatedIcon("$PSScriptRoot\icon.ico")
+
+# CORRECCIÓN: Eliminar la línea que causa el error de icono
+# $form.Icon = [System.Drawing.Icon]::ExtractAssociatedIcon("$PSScriptRoot\icon.ico")
 
 # Crear control de pestañas con tema oscuro profesional
  $tabControl = New-Object System.Windows.Forms.TabControl
@@ -89,7 +91,7 @@ class InstallationState {
 
 # Añadir pestañas al control
  $tabControl.Controls.Add($tabBasicSoftware)
- $tabControl.Controls.Add($installers)
+ $tabControl.Controls.Add($tabInstallers)
  $tabControl.Controls.Add($tabActivations)
  $tabControl.Controls.Add($tabSettings)
 
@@ -264,14 +266,11 @@ function Install-Software {
                 return $true
             }
             else {
-                # CORRECCIÓN: Usar concatenación simple sin variables problemáticas
-                $errorMessage = "Error al instalar $name"
-                $statusLabel.Text = $errorMessage
+                $statusLabel.Text = "Error al instalar $name"
                 return $false
             }
         }
         catch {
-            # CORRECCIÓN: Usar mensaje de error genérico
             $statusLabel.Text = "Error al instalar $name"
             return $false
         }
