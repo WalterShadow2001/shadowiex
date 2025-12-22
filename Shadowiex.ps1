@@ -54,25 +54,54 @@ class InstallationState {
 # Crear formulario principal con tema profesional
  $form = New-Object System.Windows.Forms.Form
  $form.Text = "Shadowiex - Professional Edition"
- $form.Size = New-Object System.Drawing.Size(900, 600)  # Tamaño ajustado
+ $form.Size = New-Object System.Drawing.Size(900, 600)
  $form.StartPosition = "CenterScreen"
  $form.BackColor = [System.Drawing.Color]::FromArgb(25, 25, 35)
  $form.ForeColor = [System.Drawing.Color]::White
 
-# Añadir logo
+# Añadir logo con manejo de errores mejorado
 try {
-    $logoPath = Join-Path -Path $PSScriptRoot -ChildPath "SHADOWIEX_LOGO.png"
-    if (Test-Path -Path $logoPath) {
-        $logoImage = [System.Drawing.Image]::FromFile($logoPath)
+    # Buscar logo en múltiples ubicaciones
+    $logoPaths = @(
+        Join-Path -Path $PSScriptRoot -ChildPath "SHADOWIEX_LOGO.png",
+        Join-Path -Path $PSScriptRoot -ChildPath "logo.png",
+        Join-Path -Path $PSScriptRoot -ChildPath "Shadowiex_Logo.png"
+    )
+    
+    $logoImage = $null
+    foreach ($path in $logoPaths) {
+        if (Test-Path -Path $path) {
+            $logoImage = [System.Drawing.Image]::FromFile($path)
+            break
+        }
+    }
+    
+    if ($logoImage) {
         $pictureBox = New-Object System.Windows.Forms.PictureBox
         $pictureBox.Image = $logoImage
-        $pictureBox.Size = New-Object System.Drawing.Size(32, 32)  # Tamaño pequeño del logo
+        $pictureBox.Size = New-Object System.Drawing.Size(32, 32)
+        $pictureBox.Location = New-Object System.Drawing.Point(10, 10)
+        $form.Controls.Add($pictureBox)
+    } else {
+        Write-Host "Logo no encontrado. Usando icono predeterminado."
+        # Usar icono predeterminado si no se encuentra el logo
+        $icon = [System.Drawing.SystemIcons]::Application
+        $pictureBox = New-Object System.Windows.Forms.PictureBox
+        $pictureBox.Image = $icon.ToBitmap()
+        $pictureBox.Size = New-Object System.Drawing.Size(32, 32)
         $pictureBox.Location = New-Object System.Drawing.Point(10, 10)
         $form.Controls.Add($pictureBox)
     }
 }
 catch {
-    Write-Host "No se pudo cargar el logo: $($_.Exception.Message)"
+    Write-Host "Error al cargar logo: $($_.Exception.Message)"
+    # Usar icono predeterminado en caso de error
+    $icon = [System.Drawing.SystemIcons]::Application
+    $pictureBox = New-Object System.Windows.Forms.PictureBox
+    $pictureBox.Image = $icon.ToBitmap()
+    $pictureBox.Size = New-Object System.Drawing.Size(32, 32)
+    $pictureBox.Location = New-Object System.Drawing.Point(10, 10)
+    $form.Controls.Add($pictureBox)
 }
 
 # Añadir texto "CREADO POR WDPN" en la esquina inferior derecha
@@ -126,8 +155,8 @@ function Create-ProfessionalButton {
         [string]$text,
         [int]$x,
         [int]$y,
-        [int]$width = 150,  # Ancho ajustado
-        [int]$height = 30,  # Alto ajustado
+        [int]$width = 150,
+        [int]$height = 30,
         [scriptblock]$action,
         [System.Drawing.Color]$backColor = [System.Drawing.Color]::FromArgb(0, 120, 212)
     )
@@ -154,7 +183,7 @@ function Create-ProfessionalLabel {
         [int]$x,
         [int]$y,
         [int]$width = 250,
-        [int]$height = 20,  # Alto ajustado
+        [int]$height = 20,
         [System.Drawing.Font]$font = $null
     )
     
@@ -618,7 +647,7 @@ function Populate-SoftwareTab {
     $scrollPanel = New-Object System.Windows.Forms.Panel
     $scrollPanel.AutoScroll = $true
     $scrollPanel.Location = New-Object System.Drawing.Point(15, 40)
-    $scrollPanel.Size = New-Object System.Drawing.Size(860, 380)  # Tamaño ajustado
+    $scrollPanel.Size = New-Object System.Drawing.Size(860, 380)
     $scrollPanel.BackColor = [System.Drawing.Color]::FromArgb(45, 45, 55)
     $tabBasicSoftware.Controls.Add($scrollPanel)
     
@@ -637,7 +666,7 @@ function Populate-SoftwareTab {
             $checkbox = New-Object System.Windows.Forms.CheckBox
             $checkbox.Text = "$($software.icon) $($software.name)"
             $checkbox.Location = New-Object System.Drawing.Point(25, $yPos)
-            $checkbox.Size = New-Object System.Drawing.Size(820, 20)  # Tamaño ajustado
+            $checkbox.Size = New-Object System.Drawing.Size(820, 20)
             $checkbox.Tag = $software.id
             $checkbox.ForeColor = [System.Drawing.Color]::White
             $checkbox.BackColor = [System.Drawing.Color]::FromArgb(45, 45, 55)
@@ -673,7 +702,7 @@ function Populate-SoftwareTab {
         # Crear formulario de progreso
         $progressForm = New-Object System.Windows.Forms.Form
         $progressForm.Text = "Instalando Software"
-        $progressForm.Size = New-Object System.Drawing.Size(450, 150)  # Tamaño ajustado
+        $progressForm.Size = New-Object System.Drawing.Size(450, 150)
         $progressForm.StartPosition = "CenterScreen"
         $progressForm.BackColor = [System.Drawing.Color]::FromArgb(25, 25, 35)
         $progressForm.FormBorderStyle = [System.Windows.Forms.FormBorderStyle]::FixedDialog
@@ -731,7 +760,7 @@ function Populate-InstallersTab {
     # Lista de instaladores
     $installersList = New-Object System.Windows.Forms.ListBox
     $installersList.Location = New-Object System.Drawing.Point(15, 40)
-    $installersList.Size = New-Object System.Drawing.Size(860, 150)  # Tamaño ajustado
+    $installersList.Size = New-Object System.Drawing.Size(860, 150)
     $installersList.BackColor = [System.Drawing.Color]::FromArgb(45, 45, 55)
     $installersList.ForeColor = [System.Drawing.Color]::White
     $installersList.SelectionMode = [System.Windows.Forms.SelectionMode]::MultiExtended
@@ -800,7 +829,7 @@ function Populate-InstallersTab {
         # Crear formulario de progreso
         $progressForm = New-Object System.Windows.Forms.Form
         $progressForm.Text = "Instalando Programas"
-        $progressForm.Size = New-Object System.Drawing.Size(450, 130)  # Tamaño ajustado
+        $progressForm.Size = New-Object System.Drawing.Size(450, 130)
         $progressForm.StartPosition = "CenterScreen"
         $progressForm.BackColor = [System.Drawing.Color]::FromArgb(25, 25, 35)
         $progressForm.FormBorderStyle = [System.Windows.Forms.FormBorderStyle]::FixedDialog
