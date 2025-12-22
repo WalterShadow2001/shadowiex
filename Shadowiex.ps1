@@ -221,7 +221,7 @@ function Install-Chocolatey {
     }
 }
 
-# Función para instalar software (CORREGIDA - sin interpolación de variables problemáticas)
+# Función para instalar software (CORREGIDA - con validaciones adicionales)
 function Install-Software {
     param (
         [string]$id,
@@ -229,6 +229,12 @@ function Install-Software {
         [System.Windows.Forms.ProgressBar]$progressBar,
         [System.Windows.Forms.Label]$statusLabel
     )
+    
+    # Validar que los controles no sean $null
+    if (-not $progressBar -or -not $statusLabel) {
+        Write-Host "Error: Controles de progreso o estado son nulos"
+        return $false
+    }
     
     $statusLabel.Text = "Instalando $name..."
     $progressBar.Value = 0
@@ -290,6 +296,12 @@ function Download-And-Install {
         [System.Windows.Forms.ProgressBar]$progressBar,
         [System.Windows.Forms.Label]$statusLabel
     )
+    
+    # Validar que los controles no sean $null
+    if (-not $progressBar -or -not $statusLabel) {
+        Write-Host "Error: Controles de progreso o estado son nulos"
+        return $false
+    }
     
     $filePath = Join-Path -Path $downloadPath -ChildPath $fileName
     
@@ -418,7 +430,7 @@ function Optimize-System {
         [System.Windows.Forms.MessageBox]::Show("Sistema optimizado correctamente.", "Optimización", [System.Windows.Forms.MessageBoxButtons]::OK, [System.Windows.Forms.MessageBoxIcon]::Information)
     }
     catch {
-        [System.Windows.Forms.MessageBox]::Show("Error al optimizar sistema: $($_.Exception.Message)", "Error", [System.Windows.Forms.MessageBoxButtons]::OK, [System.Windows.Forms.MessageBoxIcon]::Error)
+        [System.Windows.Forms.MessageBox]::Show("Error al optimizar sistema: $($_.Exception.Message)", "Error", [System.Windows.Forms.MessageBoxButtons]::OK, [System.Windows.Forms.MessageBoxButtons]::OK, [System.Windows.Forms.MessageBoxIcon]::Error)
     }
 }
 
@@ -481,7 +493,13 @@ function Initialize-Installers {
         New-Item -ItemType Directory -Path $instaladoresPath -Force | Out-Null
     }
     
-    return Get-ChildItem -Path $instaladoresPath -Filter "*.exe" -ErrorAction SilentlyContinue
+    # Validar que la ruta exista antes de intentar obtener archivos
+    if (Test-Path -Path $instaladoresPath) {
+        return Get-ChildItem -Path $instaladoresPath -Filter "*.exe" -ErrorAction SilentlyContinue
+    }
+    else {
+        return $null
+    }
 }
 
 # Función para descargar instaladores desde GitHub
@@ -701,9 +719,14 @@ function Populate-InstallersTab {
     $refreshButton = Create-ProfessionalButton -text "Actualizar Lista" -x 20 -y 260 -width 150 -height 30 -action {
         $installers = Initialize-Installers
         $installersList.Items.Clear()
-        if ($installers) {
+        
+        # Validar que $installers no sea $null antes de intentar acceder a sus propiedades
+        if ($installers -and $installers.Count -gt 0) {
             foreach ($instalador in $installers) {
-                $installersList.Items.Add($instalador.Name)
+                # Validar que el instalador tenga la propiedad Name
+                if ($instalador -and $instalador.Name) {
+                    $installersList.Items.Add($instalador.Name)
+                }
             }
         }
     }
@@ -747,7 +770,7 @@ function Populate-InstallersTab {
         }
         
         $installers = Initialize-Installers
-        if (-not $installers) {
+        if (-not $installers -or $installers.Count -eq 0) {
             [System.Windows.Forms.MessageBox]::Show("No se encontraron instaladores.", "Error", [System.Windows.Forms.MessageBoxButtons]::OK, [System.Windows.Forms.MessageBoxIcon]::Error)
             return
         }
@@ -775,14 +798,17 @@ function Populate-InstallersTab {
         $progressForm.Show()
         
         foreach ($index in $selectedIndices) {
-            $installerName = $installersList.Items[$index].ToString()
-            $installer = $installers | Where-Object { $_.Name -eq $installerName } | Select-Object -First 1
-            
-            if ($installer) {
-                $destinationPath = Join-Path $downloadPath $installer.Name
-                Copy-Item -Path $installer.FullName -Destination $destinationPath -Force
+            # Validar que el índice esté dentro del rango
+            if ($index -ge 0 -and $index -lt $installersList.Items.Count) {
+                $installerName = $installersList.Items[$index].ToString()
+                $installer = $installers | Where-Object { $_.Name -eq $installerName } | Select-Object -First 1
                 
-                Download-And-Install -url $installer.FullName -fileName $installer.Name -downloadPath $downloadPath -progressBar $progressBar -statusLabel $statusLabel
+                if ($installer) {
+                    $destinationPath = Join-Path $downloadPath $installer.Name
+                    Copy-Item -Path $installer.FullName -Destination $destinationPath -Force
+                    
+                    Download-And-Install -url $installer.FullName -fileName $installer.Name -downloadPath $downloadPath -progressBar $progressBar -statusLabel $statusLabel
+                }
             }
         }
         
