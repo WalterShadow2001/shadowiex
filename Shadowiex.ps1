@@ -54,13 +54,35 @@ class InstallationState {
 # Crear formulario principal con tema profesional
  $form = New-Object System.Windows.Forms.Form
  $form.Text = "Shadowiex - Professional Edition"
- $form.Size = New-Object System.Drawing.Size(1000, 700)
+ $form.Size = New-Object System.Drawing.Size(900, 600)  # Tamaño ajustado
  $form.StartPosition = "CenterScreen"
  $form.BackColor = [System.Drawing.Color]::FromArgb(25, 25, 35)
  $form.ForeColor = [System.Drawing.Color]::White
 
-# CORRECCIÓN: Eliminar la línea que causa el error de icono
-# $form.Icon = [System.Drawing.Icon]::ExtractAssociatedIcon("$PSScriptRoot\icon.ico")
+# Añadir logo
+try {
+    $logoPath = Join-Path -Path $PSScriptRoot -ChildPath "SHADOWIEX_LOGO.png"
+    if (Test-Path -Path $logoPath) {
+        $logoImage = [System.Drawing.Image]::FromFile($logoPath)
+        $pictureBox = New-Object System.Windows.Forms.PictureBox
+        $pictureBox.Image = $logoImage
+        $pictureBox.Size = New-Object System.Drawing.Size(32, 32)  # Tamaño pequeño del logo
+        $pictureBox.Location = New-Object System.Drawing.Point(10, 10)
+        $form.Controls.Add($pictureBox)
+    }
+}
+catch {
+    Write-Host "No se pudo cargar el logo: $($_.Exception.Message)"
+}
+
+# Añadir texto "CREADO POR WDPN" en la esquina inferior derecha
+ $createdByLabel = New-Object System.Windows.Forms.Label
+ $createdByLabel.Text = "CREADO POR WDPN"
+ $createdByLabel.Location = New-Object System.Drawing.Point(820, 560)  # Esquina inferior derecha
+ $createdByLabel.Size = New-Object System.Drawing.Size(70, 20)
+ $createdByLabel.ForeColor = [System.Drawing.Color]::FromArgb(150, 150, 150)  # Color gris claro
+ $createdByLabel.Font = New-Object System.Drawing.Font("Segoe UI", 8)
+ $form.Controls.Add($createdByLabel)
 
 # Crear control de pestañas con tema oscuro profesional
  $tabControl = New-Object System.Windows.Forms.TabControl
@@ -68,7 +90,7 @@ class InstallationState {
  $tabControl.BackColor = [System.Drawing.Color]::FromArgb(35, 35, 45)
  $tabControl.Appearance = [System.Windows.Forms.TabAppearance]::Buttons
 
-# Crear pestañas con diseño mejorado
+# Crear pestañas con diseño mejorado y tamaño ajustado
  $tabBasicSoftware = New-Object System.Windows.Forms.TabPage
  $tabBasicSoftware.Text = "Software Básico"
  $tabBasicSoftware.BackColor = [System.Drawing.Color]::FromArgb(35, 35, 45)
@@ -104,8 +126,8 @@ function Create-ProfessionalButton {
         [string]$text,
         [int]$x,
         [int]$y,
-        [int]$width = 180,
-        [int]$height = 36,
+        [int]$width = 150,  # Ancho ajustado
+        [int]$height = 30,  # Alto ajustado
         [scriptblock]$action,
         [System.Drawing.Color]$backColor = [System.Drawing.Color]::FromArgb(0, 120, 212)
     )
@@ -117,7 +139,7 @@ function Create-ProfessionalButton {
     $button.BackColor = $backColor
     $button.ForeColor = [System.Drawing.Color]::White
     $button.FlatStyle = [System.Windows.Forms.FlatStyle]::Flat
-    $button.Font = New-Object System.Drawing.Font("Segoe UI", 10, [System.Drawing.FontStyle]::Regular)
+    $button.Font = New-Object System.Drawing.Font("Segoe UI", 9, [System.Drawing.FontStyle]::Regular)
     $button.FlatAppearance.BorderSize = 0
     $button.FlatAppearance.MouseOverBackColor = [System.Drawing.Color]::FromArgb(0, 100, 180)
     $button.Add_Click($action)
@@ -131,8 +153,8 @@ function Create-ProfessionalLabel {
         [string]$text,
         [int]$x,
         [int]$y,
-        [int]$width = 300,
-        [int]$height = 23,
+        [int]$width = 250,
+        [int]$height = 20,  # Alto ajustado
         [System.Drawing.Font]$font = $null
     )
     
@@ -144,7 +166,7 @@ function Create-ProfessionalLabel {
     if ($font) {
         $label.Font = $font
     } else {
-        $label.Font = New-Object System.Drawing.Font("Segoe UI", 10, [System.Drawing.FontStyle]::Regular)
+        $label.Font = New-Object System.Drawing.Font("Segoe UI", 9, [System.Drawing.FontStyle]::Regular)
     }
     
     return $label
@@ -430,7 +452,7 @@ function Optimize-System {
         [System.Windows.Forms.MessageBox]::Show("Sistema optimizado correctamente.", "Optimización", [System.Windows.Forms.MessageBoxButtons]::OK, [System.Windows.Forms.MessageBoxIcon]::Information)
     }
     catch {
-        [System.Windows.Forms.MessageBox]::Show("Error al optimizar sistema: $($_.Exception.Message)", "Error", [System.Windows.Forms.MessageBoxButtons]::OK, [System.Windows.Forms.MessageBoxButtons]::OK, [System.Windows.Forms.MessageBoxIcon]::Error)
+        [System.Windows.Forms.MessageBox]::Show("Error al optimizar sistema: $($_.Exception.Message)", "Error", [System.Windows.Forms.MessageBoxButtons]::OK, [System.Windows.Forms.MessageBoxIcon]::Error)
     }
 }
 
@@ -584,19 +606,19 @@ function Download-InstallersFromGitHub {
     )
 }
 
-# Poblar pestaña de Software Básico con diseño mejorado
+# Poblar pestaña de Software Básico con diseño mejorado y tamaño ajustado
 function Populate-SoftwareTab {
     $tabBasicSoftware.Controls.Clear()
     
     # Título
-    $titleLabel = Create-ProfessionalLabel -text "Seleccione el software a instalar:" -x 20 -y 15 -font (New-Object System.Drawing.Font("Segoe UI", 12, [System.Drawing.FontStyle]::Bold))
+    $titleLabel = Create-ProfessionalLabel -text "Seleccione el software a instalar:" -x 15 -y 10 -font (New-Object System.Drawing.Font("Segoe UI", 10, [System.Drawing.FontStyle]::Bold))
     $tabBasicSoftware.Controls.Add($titleLabel)
     
     # Panel con scroll
     $scrollPanel = New-Object System.Windows.Forms.Panel
     $scrollPanel.AutoScroll = $true
-    $scrollPanel.Location = New-Object System.Drawing.Point(20, 50)
-    $scrollPanel.Size = New-Object System.Drawing.Size(940, 450)
+    $scrollPanel.Location = New-Object System.Drawing.Point(15, 40)
+    $scrollPanel.Size = New-Object System.Drawing.Size(860, 380)  # Tamaño ajustado
     $scrollPanel.BackColor = [System.Drawing.Color]::FromArgb(45, 45, 55)
     $tabBasicSoftware.Controls.Add($scrollPanel)
     
@@ -605,17 +627,17 @@ function Populate-SoftwareTab {
     
     foreach ($category in $softwareCategories.Keys) {
         # Etiqueta de categoría
-        $categoryLabel = Create-ProfessionalLabel -text $category -x 10 -y $yPos -font (New-Object System.Drawing.Font("Segoe UI", 11, [System.Drawing.FontStyle]::Bold))
+        $categoryLabel = Create-ProfessionalLabel -text $category -x 10 -y $yPos -font (New-Object System.Drawing.Font("Segoe UI", 9, [System.Drawing.FontStyle]::Bold))
         $scrollPanel.Controls.Add($categoryLabel)
         
-        $yPos += 30
+        $yPos += 25
         
         foreach ($software in $softwareCategories[$category]) {
             # Checkbox con icono
             $checkbox = New-Object System.Windows.Forms.CheckBox
             $checkbox.Text = "$($software.icon) $($software.name)"
-            $checkbox.Location = New-Object System.Drawing.Point(30, $yPos)
-            $checkbox.Size = New-Object System.Drawing.Size(900, 25)
+            $checkbox.Location = New-Object System.Drawing.Point(25, $yPos)
+            $checkbox.Size = New-Object System.Drawing.Size(820, 20)  # Tamaño ajustado
             $checkbox.Tag = $software.id
             $checkbox.ForeColor = [System.Drawing.Color]::White
             $checkbox.BackColor = [System.Drawing.Color]::FromArgb(45, 45, 55)
@@ -623,14 +645,14 @@ function Populate-SoftwareTab {
             
             $global:allCheckboxes += @{checkbox = $checkbox; id = $software.id; name = $software.name}
             
-            $yPos += 30
+            $yPos += 25
         }
         
-        $yPos += 15
+        $yPos += 10
     }
     
     # Botones de acción
-    $installButton = Create-ProfessionalButton -text "Instalar Software Seleccionado" -x 20 -y 520 -width 220 -action {
+    $installButton = Create-ProfessionalButton -text "Instalar Software Seleccionado" -x 15 -y 430 -width 180 -action {
         $selectedSoftware = $global:allCheckboxes | Where-Object { $_.checkbox.Checked }
         
         if ($selectedSoftware.Count -eq 0) {
@@ -651,21 +673,21 @@ function Populate-SoftwareTab {
         # Crear formulario de progreso
         $progressForm = New-Object System.Windows.Forms.Form
         $progressForm.Text = "Instalando Software"
-        $progressForm.Size = New-Object System.Drawing.Size(500, 200)
+        $progressForm.Size = New-Object System.Drawing.Size(450, 150)  # Tamaño ajustado
         $progressForm.StartPosition = "CenterScreen"
         $progressForm.BackColor = [System.Drawing.Color]::FromArgb(25, 25, 35)
         $progressForm.FormBorderStyle = [System.Windows.Forms.FormBorderStyle]::FixedDialog
         
-        $progressLabel = Create-ProfessionalLabel -text "Instalando software..." -x 20 -y 20 -width 460
+        $progressLabel = Create-ProfessionalLabel -text "Instalando software..." -x 15 -y 15 -width 420
         $progressForm.Controls.Add($progressLabel)
         
         $progressBar = New-Object System.Windows.Forms.ProgressBar
-        $progressBar.Location = New-Object System.Drawing.Point(20, 50)
-        $progressBar.Size = New-Object System.Drawing.Size(460, 20)
+        $progressBar.Location = New-Object System.Drawing.Point(15, 40)
+        $progressBar.Size = New-Object System.Drawing.Size(420, 20)
         $progressBar.Style = [System.Windows.Forms.ProgressBarStyle]::Marquee
         $progressForm.Controls.Add($progressBar)
         
-        $statusLabel = Create-ProfessionalLabel -text "" -x 20 -y 80 -width 460
+        $statusLabel = Create-ProfessionalLabel -text "" -x 15 -y 70 -width 420
         $progressForm.Controls.Add($statusLabel)
         
         $progressForm.Show()
@@ -684,14 +706,14 @@ function Populate-SoftwareTab {
     }
     $tabBasicSoftware.Controls.Add($installButton)
     
-    $selectAllButton = Create-ProfessionalButton -text "Seleccionar Todo" -x 250 -y 520 -width 150 -height 30 -action {
+    $selectAllButton = Create-ProfessionalButton -text "Seleccionar Todo" -x 205 -y 430 -width 120 -height 30 -action {
         foreach ($item in $global:allCheckboxes) {
             $item.checkbox.Checked = $true
         }
     }
     $tabBasicSoftware.Controls.Add($selectAllButton)
     
-    $deselectAllButton = Create-ProfessionalButton -text "Deseleccionar Todo" -x 410 -y 520 -width 150 -height 30 -action {
+    $deselectAllButton = Create-ProfessionalButton -text "Deseleccionar Todo" -x 335 -y 430 -width 120 -height 30 -action {
         foreach ($item in $global:allCheckboxes) {
             $item.checkbox.Checked = $false
         }
@@ -699,24 +721,24 @@ function Populate-SoftwareTab {
     $tabBasicSoftware.Controls.Add($deselectAllButton)
 }
 
-# Poblar pestaña de Instaladores Personalizados
+# Poblar pestaña de Instaladores Personalizados con tamaño ajustado
 function Populate-InstallersTab {
     $tabInstallers.Controls.Clear()
     
-    $titleLabel = Create-ProfessionalLabel -text "Gestor de Instaladores Personalizados" -x 20 -y 15 -font (New-Object System.Drawing.Font("Segoe UI", 12, [System.Drawing.FontStyle]::Bold))
+    $titleLabel = Create-ProfessionalLabel -text "Gestor de Instaladores Personalizados" -x 15 -y 10 -font (New-Object System.Drawing.Font("Segoe UI", 10, [System.Drawing.FontStyle]::Bold))
     $tabInstallers.Controls.Add($titleLabel)
     
     # Lista de instaladores
     $installersList = New-Object System.Windows.Forms.ListBox
-    $installersList.Location = New-Object System.Drawing.Point(20, 50)
-    $installersList.Size = New-Object System.Drawing.Size(940, 200)
+    $installersList.Location = New-Object System.Drawing.Point(15, 40)
+    $installersList.Size = New-Object System.Drawing.Size(860, 150)  # Tamaño ajustado
     $installersList.BackColor = [System.Drawing.Color]::FromArgb(45, 45, 55)
     $installersList.ForeColor = [System.Drawing.Color]::White
     $installersList.SelectionMode = [System.Windows.Forms.SelectionMode]::MultiExtended
     $tabInstallers.Controls.Add($installersList)
     
     # Botón de refresco
-    $refreshButton = Create-ProfessionalButton -text "Actualizar Lista" -x 20 -y 260 -width 150 -height 30 -action {
+    $refreshButton = Create-ProfessionalButton -text "Actualizar Lista" -x 15 -y 200 -width 120 -height 30 -action {
         $installers = Initialize-Installers
         $installersList.Items.Clear()
         
@@ -733,18 +755,18 @@ function Populate-InstallersTab {
     $tabInstallers.Controls.Add($refreshButton)
     
     # Carpeta de descarga
-    $downloadFolderLabel = Create-ProfessionalLabel -text "Carpeta de Descarga:" -x 200 -y 260
+    $downloadFolderLabel = Create-ProfessionalLabel -text "Carpeta de Descarga:" -x 145 -y 200
     $tabInstallers.Controls.Add($downloadFolderLabel)
     
     $downloadFolderTextBox = New-Object System.Windows.Forms.TextBox
-    $downloadFolderTextBox.Location = New-Object System.Drawing.Point(320, 260)
-    $downloadFolderTextBox.Size = New-Object System.Drawing.Size(300, 23)
+    $downloadFolderTextBox.Location = New-Object System.Drawing.Point(265, 200)
+    $downloadFolderTextBox.Size = New-Object System.Drawing.Size(240, 23)
     $downloadFolderTextBox.Text = [Environment]::GetFolderPath("Desktop")
     $downloadFolderTextBox.BackColor = [System.Drawing.Color]::FromArgb(60, 60, 70)
     $downloadFolderTextBox.ForeColor = [System.Drawing.Color]::White
     $tabInstallers.Controls.Add($downloadFolderTextBox)
     
-    $selectFolderButton = Create-ProfessionalButton -text "Examinar..." -x 630 -y 260 -width 100 -height 23 -action {
+    $selectFolderButton = Create-ProfessionalButton -text "Examinar..." -x 515 -y 200 -width 80 -height 23 -action {
         $folderBrowser = New-Object System.Windows.Forms.FolderBrowserDialog
         $folderBrowser.Description = "Seleccionar carpeta de descarga"
         $folderBrowser.SelectedPath = $downloadFolderTextBox.Text
@@ -756,7 +778,7 @@ function Populate-InstallersTab {
     $tabInstallers.Controls.Add($selectFolderButton)
     
     # Botón de instalación
-    $installButton = Create-ProfessionalButton -text "Instalar Seleccionados" -x 200 -y 300 -width 220 -height 40 -action {
+    $installButton = Create-ProfessionalButton -text "Instalar Seleccionados" -x 155 -y 240 -width 180 -height 35 -action {
         $selectedIndices = $installersList.SelectedIndices
         if ($selectedIndices.Count -eq 0) {
             [System.Windows.Forms.MessageBox]::Show("Por favor, seleccione al menos un instalador.", "Sin Selección", [System.Windows.Forms.MessageBoxButtons]::OK, [System.Windows.Forms.MessageBoxIcon]::Warning)
@@ -778,21 +800,21 @@ function Populate-InstallersTab {
         # Crear formulario de progreso
         $progressForm = New-Object System.Windows.Forms.Form
         $progressForm.Text = "Instalando Programas"
-        $progressForm.Size = New-Object System.Drawing.Size(500, 150)
+        $progressForm.Size = New-Object System.Drawing.Size(450, 130)  # Tamaño ajustado
         $progressForm.StartPosition = "CenterScreen"
         $progressForm.BackColor = [System.Drawing.Color]::FromArgb(25, 25, 35)
         $progressForm.FormBorderStyle = [System.Windows.Forms.FormBorderStyle]::FixedDialog
         
-        $progressLabel = Create-ProfessionalLabel -text "Instalando programas..." -x 20 -y 20 -width 460
+        $progressLabel = Create-ProfessionalLabel -text "Instalando programas..." -x 15 -y 15 -width 420
         $progressForm.Controls.Add($progressLabel)
         
         $progressBar = New-Object System.Windows.Forms.ProgressBar
-        $progressBar.Location = New-Object System.Drawing.Point(20, 50)
-        $progressBar.Size = New-Object System.Drawing.Size(460, 20)
+        $progressBar.Location = New-Object System.Drawing.Point(15, 40)
+        $progressBar.Size = New-Object System.Drawing.Size(420, 20)
         $progressBar.Style = [System.Windows.Forms.ProgressBarStyle]::Marquee
         $progressForm.Controls.Add($progressBar)
         
-        $statusLabel = Create-ProfessionalLabel -text "" -x 20 -y 80 -width 460
+        $statusLabel = Create-ProfessionalLabel -text "" -x 15 -y 70 -width 420
         $progressForm.Controls.Add($statusLabel)
         
         $progressForm.Show()
@@ -818,7 +840,7 @@ function Populate-InstallersTab {
     $tabInstallers.Controls.Add($installButton)
     
     # Botón de descarga desde GitHub
-    $downloadFromGitHubButton = Create-ProfessionalButton -text "Descargar desde GitHub" -x 440 -y 300 -width 180 -height 40 -action {
+    $downloadFromGitHubButton = Create-ProfessionalButton -text "Descargar desde GitHub" -x 345 -y 240 -width 150 -height 35 -action {
         $folderBrowser = New-Object System.Windows.Forms.FolderBrowserDialog
         $folderBrowser.Description = "Seleccionar carpeta para guardar instaladores"
         $folderBrowser.SelectedPath = [Environment]::GetFolderPath("Desktop")
@@ -830,52 +852,52 @@ function Populate-InstallersTab {
     $tabInstallers.Controls.Add($downloadFromGitHubButton)
 }
 
-# Poblar pestaña de Activaciones y Optimización
+# Poblar pestaña de Activaciones y Optimización con tamaño ajustado
 function Populate-ActivationsTab {
     $tabActivations.Controls.Clear()
     
-    $titleLabel = Create-ProfessionalLabel -text "Activaciones y Optimización del Sistema" -x 20 -y 15 -font (New-Object System.Drawing.Font("Segoe UI", 12, [System.Drawing.FontStyle]::Bold))
+    $titleLabel = Create-ProfessionalLabel -text "Activaciones y Optimización del Sistema" -x 15 -y 10 -font (New-Object System.Drawing.Font("Segoe UI", 10, [System.Drawing.FontStyle]::Bold))
     $tabActivations.Controls.Add($titleLabel)
     
     # Botones de activación
-    $activateButton = Create-ProfessionalButton -text "Activar Windows y Office" -x 30 -y 60 -width 200 -height 40 -action {
+    $activateButton = Create-ProfessionalButton -text "Activar Windows y Office" -x 20 -y 45 -width 160 -height 30 -action {
         Activate-WindowsAndOffice
     }
     $tabActivations.Controls.Add($activateButton)
     
-    $activatedWinButton = Create-ProfessionalButton -text "Ejecutar Script Activated.Win" -x 30 -y 110 -width 200 -height 40 -action {
+    $activatedWinButton = Create-ProfessionalButton -text "Ejecutar Script Activated.Win" -x 20 -y 85 -width 160 -height 30 -action {
         Run-ActivatedWin
     }
     $tabActivations.Controls.Add($activatedWinButton)
     
-    $chrisTitusButton = Create-ProfessionalButton -text "Ejecutar Script de Chris Titus" -x 30 -y 160 -width 200 -height 40 -action {
+    $chrisTitusButton = Create-ProfessionalButton -text "Ejecutar Script de Chris Titus" -x 20 -y 125 -width 160 -height 30 -action {
         Run-ChrisTitusScript
     }
     $tabActivations.Controls.Add($chrisTitusButton)
     
     # Botones de optimización
-    $optimizeNetworkButton = Create-ProfessionalButton -text "Optimizar Red" -x 250 -y 60 -width 200 -height 40 -action {
+    $optimizeNetworkButton = Create-ProfessionalButton -text "Optimizar Red" -x 200 -y 45 -width 160 -height 30 -action {
         Optimize-Network
     }
     $tabActivations.Controls.Add($optimizeNetworkButton)
     
-    $optimizeSystemButton = Create-ProfessionalButton -text "Optimizar Sistema" -x 250 -y 110 -width 200 -height 40 -action {
+    $optimizeSystemButton = Create-ProfessionalButton -text "Optimizar Sistema" -x 200 -y 85 -width 160 -height 30 -action {
         Optimize-System
     }
     $tabActivations.Controls.Add($optimizeSystemButton)
     
-    $cleanTempButton = Create-ProfessionalButton -text "Limpiar Archivos Temporales" -x 250 -y 160 -width 200 -height 40 -action {
+    $cleanTempButton = Create-ProfessionalButton -text "Limpiar Archivos Temporales" -x 200 -y 125 -width 160 -height 30 -action {
         Clean-TempFiles
     }
     $tabActivations.Controls.Add($cleanTempButton)
     
-    $createRestorePointButton = Create-ProfessionalButton -text "Crear Punto de Restauración" -x 250 -y 210 -width 200 -height 40 -action {
+    $createRestorePointButton = Create-ProfessionalButton -text "Crear Punto de Restauración" -x 200 -y 165 -width 160 -height 30 -action {
         Create-RestorePoint
     }
     $tabActivations.Controls.Add($createRestorePointButton)
     
     # Información del sistema
-    $systemInfoLabel = Create-ProfessionalLabel -text "Información del Sistema" -x 470 -y 60 -font (New-Object System.Drawing.Font("Segoe UI", 11, [System.Drawing.FontStyle]::Bold))
+    $systemInfoLabel = Create-ProfessionalLabel -text "Información del Sistema" -x 380 -y 45 -font (New-Object System.Drawing.Font("Segoe UI", 9, [System.Drawing.FontStyle]::Bold))
     $tabActivations.Controls.Add($systemInfoLabel)
     
     $osInfo = Get-CimInstance Win32_OperatingSystem
@@ -890,47 +912,47 @@ Memoria RAM: $([math]::Round($osInfo.TotalVisibleMemorySize / 1MB)) GB
 Disco Duro: $([math]::Round((Get-PSDrive C).Used / 1GB)) GB / $([math]::Round((Get-PSDrive C).Free / 1GB)) GB libres
 "@
     
-    $infoLabel = Create-ProfessionalLabel -text $infoText -x 470 -y 90 -width 480 -height 150
+    $infoLabel = Create-ProfessionalLabel -text $infoText -x 380 -y 75 -width 490 -height 120
     $tabActivations.Controls.Add($infoLabel)
 }
 
-# Poblar pestaña de Configuración
+# Poblar pestaña de Configuración con tamaño ajustado
 function Populate-SettingsTab {
     $tabSettings.Controls.Clear()
     
-    $titleLabel = Create-ProfessionalLabel -text "Configuración del Sistema" -x 20 -y 15 -font (New-Object System.Drawing.Font("Segoe UI", 12, [System.Drawing.FontStyle]::Bold))
+    $titleLabel = Create-ProfessionalLabel -text "Configuración del Sistema" -x 15 -y 10 -font (New-Object System.Drawing.Font("Segoe UI", 10, [System.Drawing.FontStyle]::Bold))
     $tabSettings.Controls.Add($titleLabel)
     
     # Configuración de winget
-    $wingetLabel = Create-ProfessionalLabel -text "Configuración de Winget:" -x 30 -y 50 -font (New-Object System.Drawing.Font("Segoe UI", 10, [System.Drawing.FontStyle]::Bold))
+    $wingetLabel = Create-ProfessionalLabel -text "Configuración de Winget:" -x 20 -y 40 -font (New-Object System.Drawing.Font("Segoe UI", 9, [System.Drawing.FontStyle]::Bold))
     $tabSettings.Controls.Add($wingetLabel)
     
     $wingetStatus = if (Test-Winget) { "Instalado" } else { "No Instalado" }
-    $wingetStatusLabel = Create-ProfessionalLabel -text "Estado: $wingetStatus" -x 30 -y 75
+    $wingetStatusLabel = Create-ProfessionalLabel -text "Estado: $wingetStatus" -x 20 -y 60
     $tabSettings.Controls.Add($wingetStatusLabel)
     
-    $installWingetButton = Create-ProfessionalButton -text "Instalar Winget" -x 30 -y 100 -width 150 -height 30 -action {
+    $installWingetButton = Create-ProfessionalButton -text "Instalar Winget" -x 20 -y 80 -width 120 -height 30 -action {
         Install-Winget
         $wingetStatusLabel.Text = "Estado: Instalado"
     }
     $tabSettings.Controls.Add($installWingetButton)
     
     # Configuración de Chocolatey
-    $chocoLabel = Create-ProfessionalLabel -text "Configuración de Chocolatey:" -x 30 -y 140 -font (New-Object System.Drawing.Font("Segoe UI", 10, [System.Drawing.FontStyle]::Bold))
+    $chocoLabel = Create-ProfessionalLabel -text "Configuración de Chocolatey:" -x 20 -y 120 -font (New-Object System.Drawing.Font("Segoe UI", 9, [System.Drawing.FontStyle]::Bold))
     $tabSettings.Controls.Add($chocoLabel)
     
     $chocoStatus = if (Test-Chocolatey) { "Instalado" } else { "No Instalado" }
-    $chocoStatusLabel = Create-ProfessionalLabel -text "Estado: $chocoStatus" -x 30 -y 165
+    $chocoStatusLabel = Create-ProfessionalLabel -text "Estado: $chocoStatus" -x 20 -y 140
     $tabSettings.Controls.Add($chocoStatusLabel)
     
-    $installChocoButton = Create-ProfessionalButton -text "Instalar Chocolatey" -x 30 -y 190 -width 150 -height 30 -action {
+    $installChocoButton = Create-ProfessionalButton -text "Instalar Chocolatey" -x 20 -y 160 -width 120 -height 30 -action {
         Install-Chocolatey
         $chocoStatusLabel.Text = "Estado: Instalado"
     }
     $tabSettings.Controls.Add($installChocoButton)
     
     # Limpiar caché
-    $clearCacheButton = Create-ProfessionalButton -text "Limpiar Caché" -x 30 -y 240 -width 150 -height 30 -action {
+    $clearCacheButton = Create-ProfessionalButton -text "Limpiar Caché" -x 20 -y 200 -width 120 -height 30 -action {
         try {
             if (Test-Winget) {
                 winget cache reset
@@ -947,10 +969,10 @@ function Populate-SettingsTab {
     $tabSettings.Controls.Add($clearCacheButton)
     
     # Actualizar Shadowiex
-    $updateLabel = Create-ProfessionalLabel -text "Actualizar Shadowiex:" -x 30 -y 290 -font (New-Object System.Drawing.Font("Segoe UI", 10, [System.Drawing.FontStyle]::Bold))
+    $updateLabel = Create-ProfessionalLabel -text "Actualizar Shadowiex:" -x 20 -y 240 -font (New-Object System.Drawing.Font("Segoe UI", 9, [System.Drawing.FontStyle]::Bold))
     $tabSettings.Controls.Add($updateLabel)
     
-    $updateButton = Create-ProfessionalButton -text "Actualizar desde GitHub" -x 30 -y 315 -width 150 -height 30 -action {
+    $updateButton = Create-ProfessionalButton -text "Actualizar desde GitHub" -x 20 -y 260 -width 120 -height 30 -action {
         try {
             $updateUrl = "https://github.com/WalterShadow2001/shadowiex/raw/main/Shadowiex.ps1"
             $tempFile = "$env:TEMP\Shadowiex.ps1"
