@@ -145,7 +145,7 @@ function Create-ModernButton {
         [int]$width = 190,
         [int]$height = 45,
         [scriptblock]$action,
-        # CORRECCIÓN: Cambiado de [System.Drawing.Color] a [object] para evitar el error de conversión NULL
+        # CORRECCIÓN CRÍTICA: [object] permite NULL sin errores en PS 5.1
         [object]$backColor = $null
     )
     
