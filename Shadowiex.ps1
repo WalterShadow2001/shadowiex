@@ -1,11 +1,11 @@
 <#
 .SYNOPSIS
-    Shadowiex - Professional Edition (Rediseño UI Moderno)
+    Shadowiex - Professional Edition (UI Moderna y Completa)
 .DESCRIPTION
-    Herramienta de configuración con interfaz moderna estilo "Dark Glass", optimizada para legibilidad y experiencia de usuario.
+    Herramienta de configuración completa con interfaz moderna "Dark Glass", lista de software extendida y manejo robusto de errores.
 .NOTES
     Autor: WalterShadow2001
-    Versión: 4.0 - Modern UI
+    Versión: 4.1 - Fixed Syntax & Full Software List
 #>
 
 # --- CONFIGURACIÓN INICIAL Y TEMAS ---
@@ -13,16 +13,17 @@
  $ProgressPreference = 'SilentlyContinue'
  $script:UIControls = @{}
 
-# Paleta de Colores "Shadow Modern"
+# Paleta de Colores Moderna
  $colors = @{
-    Background  = [System.Drawing.Color]::FromArgb(30, 30, 40)       # Fondo oscuro profundo
-    Panel       = [System.Drawing.Color]::FromArgb(45, 45, 55)       # Paneles secundarios
-    Accent      = [System.Drawing.Color]::FromArgb(0, 120, 215)      # Azul brillante (Acción)
-    AccentHover = [System.Drawing.Color]::FromArgb(0, 90, 180)       # Azul oscuro (Hover)
+    Background  = [System.Drawing.Color]::FromArgb(30, 30, 40)
+    Panel       = [System.Drawing.Color]::FromArgb(45, 45, 55)
+    Accent      = [System.Drawing.Color]::FromArgb(0, 120, 215)
+    AccentHover = [System.Drawing.Color]::FromArgb(0, 90, 180)
     Text        = [System.Drawing.Color]::White
     TextSub     = [System.Drawing.Color]::FromArgb(180, 180, 180)
-    Success     = [System.Drawing.Color]::FromArgb(13, 188, 121)      # Verde
-    Danger      = [System.Drawing.Color]::FromArgb(235, 77, 75)       # Rojo
+    Success     = [System.Drawing.Color]::FromArgb(16, 185, 129)
+    Warning     = [System.Drawing.Color]::FromArgb(245, 159, 0)
+    Danger      = [System.Drawing.Color]::FromArgb(239, 68, 68)
 }
 
 # Verificación de Administrador
@@ -45,11 +46,11 @@ Add-Type -AssemblyName System.Management.Automation
 # --- FORMULARIO PRINCIPAL ---
  $form = New-Object System.Windows.Forms.Form
  $form.Text = "Shadowiex - Professional Edition"
- $form.Size = New-Object System.Drawing.Size(950, 650)
+ $form.Size = New-Object System.Drawing.Size(960, 660)
  $form.StartPosition = "CenterScreen"
  $form.BackColor = $colors.Background
  $form.ForeColor = $colors.Text
- $form.MinimumSize = New-Object System.Drawing.Size(950, 650)
+ $form.MinimumSize = New-Object System.Drawing.Size(960, 660)
 
 # --- CARGA DE LOGO E ICONO ---
 try {
@@ -61,71 +62,81 @@ try {
         $form.Icon = [System.Drawing.Icon]::ExtractAssociatedIcon($iconPath)
     }
 
-    # Cargar Logo (PictureBox) más grande y centrado en el header
+    # Cargar Logo en Header
     $logoPath = Join-Path -Path $scriptRoot -ChildPath "SHADOWIEX_LOGO.png"
+    $pictureBox = $null
+    $titleLabel = $null
+
     if (Test-Path -Path $logoPath) {
         $logoImage = [System.Drawing.Image]::FromFile($logoPath)
         $pictureBox = New-Object System.Windows.Forms.PictureBox
         $pictureBox.Image = $logoImage
-        $pictureBox.SizeMode = [System.Windows.Forms.PictureBoxSizeMode]::Zoom # Ajustar imagen
-        $pictureBox.Size = New-Object System.Drawing.Size(48, 48) # Más grande
-        $pictureBox.Location = New-Object System.Drawing.Point(15, 15)
+        $pictureBox.SizeMode = [System.Windows.Forms.PictureBoxSizeMode]::Zoom
+        $pictureBox.Size = New-Object System.Drawing.Size(50, 50)
+        $pictureBox.Location = New-Object System.Drawing.Point(20, 15)
         $pictureBox.BackColor = [System.Drawing.Color]::Transparent
         $form.Controls.Add($pictureBox)
         
-        # Título junto al logo
+        # Título al lado del logo
         $titleLabel = New-Object System.Windows.Forms.Label
         $titleLabel.Text = "Shadowiex Professional"
-        $titleLabel.Location = New-Object System.Drawing.Point(75, 25)
-        $titleLabel.Size = New-Object System.Drawing.Size(300, 30)
-        $titleLabel.Font = New-Object System.Drawing.Font("Segoe UI", 14, [System.Drawing.FontStyle]::Bold)
+        $titleLabel.Location = New-Object System.Drawing.Point(80, 25)
+        $titleLabel.Size = New-Object System.Drawing.Size(300, 35)
+        $titleLabel.Font = New-Object System.Drawing.Font("Segoe UI", 16, [System.Drawing.FontStyle]::Bold)
         $titleLabel.ForeColor = $colors.Text
+        $form.Controls.Add($titleLabel)
+    } else {
+        # Fallback si no hay logo
+        $titleLabel = New-Object System.Windows.Forms.Label
+        $titleLabel.Text = "Shadowiex Professional"
+        $titleLabel.Location = New-Object System.Drawing.Point(20, 25)
+        $titleLabel.Size = New-Object System.Drawing.Size(300, 35)
+        $titleLabel.Font = New-Object System.Drawing.Font("Segoe UI", 16, [System.Drawing.FontStyle]::Bold)
         $form.Controls.Add($titleLabel)
     }
 }
 catch {
-    Write-Warning "No se pudo cargar el logo/icono. Asegúrese de que SHADOWIEX_LOGO.png y .ico estén en la carpeta del script."
+    Write-Warning "Error cargando recursos visuales."
 }
 
 # --- FOOTER (CREADO POR WDPN) ---
-# Posicionado a la izquierda para asegurar visibilidad y estilo
  $footerLabel = New-Object System.Windows.Forms.Label
  $footerLabel.Text = "CREADO POR WDPN"
- $footerLabel.Location = New-Object System.Drawing.Point(15, 590)
- $footerLabel.Size = New-Object System.Drawing.Size(200, 30)
+ $footerLabel.Location = New-Object System.Drawing.Point(20, 600)
+ $footerLabel.Size = New-Object System.Drawing.Size(250, 30)
  $footerLabel.ForeColor = $colors.TextSub
- $footerLabel.Font = New-Object System.Drawing.Font("Segoe UI", 9, [System.Drawing.FontStyle]::Italic)
+ $footerLabel.Font = New-Object System.Drawing.Font("Segoe UI", 10, [System.Drawing.FontStyle]::Italic)
  $form.Controls.Add($footerLabel)
 
-# --- CONTROL DE PESTAÑAS (TAB CONTROL) ---
+# --- CONTROL DE PESTAÑAS ---
  $tabControl = New-Object System.Windows.Forms.TabControl
- $tabControl.Dock = [System.Windows.Forms.DockStyle]::Fill
+ $tabControl.Location = New-Object System.Drawing.Point(0, 80)
+ $tabControl.Size = New-Object System.Drawing.Size(944, 510)
  $tabControl.BackColor = $colors.Background
- $tabControl.Appearance = [System.Windows.Forms.TabAppearance]::Buttons # Estilo Botón
- $tabControl.ItemSize = New-Object System.Drawing.Size(140, 35) # Pestañas más grandes y cómodas
- $tabControl.Font = New-Object System.Drawing.Font("Segoe UI", 10, [System.Drawing.FontStyle]::Bold)
+ $tabControl.Appearance = [System.Windows.Forms.TabAppearance]::Buttons
+ $tabControl.ItemSize = New-Object System.Drawing.Size(150, 40)
+ $tabControl.Font = New-Object System.Drawing.Font("Segoe UI", 10.5, [System.Drawing.FontStyle]::Bold)
  $tabControl.Padding = New-Object System.Drawing.Point(10, 5)
 
-# Definir Pestañas
  $tabBasicSoftware = New-Object System.Windows.Forms.TabPage
  $tabBasicSoftware.Text = "Software Básico"
  $tabBasicSoftware.BackColor = $colors.Background
- $tabBasicSoftware.Padding = New-Object System.Windows.Forms.Padding(10)
+ $tabBasicSoftware.Padding = New-Object System.Windows.Forms.Padding(15)
 
  $tabInstallers = New-Object System.Windows.Forms.TabPage
  $tabInstallers.Text = "Instaladores"
  $tabInstallers.BackColor = $colors.Background
- $tabInstallers.Padding = New-Object System.Windows.Forms.Padding(10)
+ $tabInstallers.Padding = New-Object System.Windows.Forms.Padding(15)
 
  $tabActivations = New-Object System.Windows.Forms.TabPage
  $tabActivations.Text = "Activaciones"
  $tabActivations.BackColor = $colors.Background
- $tabActivations.Padding = New-Object System.Windows.Forms.Padding(10)
+ $tabActivations.Padding = New-Object System.Windows.Forms.Padding(15)
 
  $tabSettings = New-Object System.Windows.Forms.TabPage
  $tabSettings.Text = "Configuración"
  $tabSettings.BackColor = $colors.Background
- $tabSettings.Padding = New-Object System.Windows.Forms.Padding(10)
+ $tabSettings.Padding = New-Object System.Windows.Forms.Padding(15)
 
  $tabControl.Controls.Add($tabBasicSoftware)
  $tabControl.Controls.Add($tabInstallers)
@@ -133,15 +144,15 @@ catch {
  $tabControl.Controls.Add($tabSettings)
  $form.Controls.Add($tabControl)
 
-# --- FUNCIONES UI HELPER ---
+# --- FUNCIONES UI ---
 
 function Create-ModernButton {
     param (
         [string]$text,
         [int]$x,
         [int]$y,
-        [int]$width = 180, # Ancho predeterminado más amplio
-        [int]$height = 40,  # Alto más cómodo para click
+        [int]$width = 190,
+        [int]$height = 45,
         [scriptblock]$action,
         [System.Drawing.Color]$backColor = $null
     )
@@ -155,19 +166,18 @@ function Create-ModernButton {
     $button.BackColor = $btnColor
     $button.ForeColor = [System.Drawing.Color]::White
     $button.FlatStyle = [System.Windows.Forms.FlatStyle]::Flat
-    $button.Font = New-Object System.Drawing.Font("Segoe UI", 9.5, [System.Drawing.FontStyle]::Semibold)
+    $button.Font = New-Object System.Drawing.Font("Segoe UI", 10, [System.Drawing.FontStyle]::Semibold)
     $button.Cursor = [System.Windows.Forms.Cursors]::Hand
-    
-    # Efecto Plano
     $button.FlatAppearance.BorderSize = 0
+    
+    # Simular Hover
     $button.FlatAppearance.MouseOverBackColor = if($backColor) { 
-        # Si es un color especial (Rojo/Verde), oscurecerlo manualmente
-        [System.Drawing.Color]::FromArgb($backColor.R - 20, $backColor.G - 20, $backColor.B - 20)
+        [System.Drawing.Color]::FromArgb([Math]::Max(0, $backColor.R - 20), [Math]::Max(0, $backColor.G - 20), [Math]::Max(0, $backColor.B - 20))
     } else { 
         $colors.AccentHover 
     }
     
-    $button.Add_Click($action)
+    if ($action) { $button.Add_Click($action) }
     return $button
 }
 
@@ -180,23 +190,24 @@ function Create-ModernLabel {
         [bool]$isTitle = $false
     )
     
+    # Corrección de Sintaxis: Calcular altura fuera del constructor
+    $labelHeight = if($isTitle){35}else{25}
+    
     $label = New-Object System.Windows.Forms.Label
     $label.Text = $text
     $label.Location = New-Object System.Drawing.Point($x, $y)
-    $label.Size = New-Object System.Drawing.Size($width, if($isTitle){30}else{20})
+    $label.Size = New-Object System.Drawing.Size($width, $labelHeight)
     $label.ForeColor = $colors.Text
     
     if ($isTitle) {
-        $label.Font = New-Object System.Drawing.Font("Segoe UI", 12, [System.Drawing.FontStyle]::Bold)
+        $label.Font = New-Object System.Drawing.Font("Segoe UI", 13, [System.Drawing.FontStyle]::Bold)
     } else {
-        $label.Font = New-Object System.Drawing.Font("Segoe UI", 9)
+        $label.Font = New-Object System.Drawing.Font("Segoe UI", 10)
     }
     return $label
 }
 
-# --- LÓGICA DE SOFTWARE E INSTALACIÓN ---
-# (Mantiene la lógica robusta anterior)
-
+# --- LÓGICA DE INSTALACIÓN ---
 function Test-Winget { try { $null = winget --version; return $true } catch { return $false } }
 function Test-Chocolatey { try { $null = choco --version; return $true } catch { return $false } }
 
@@ -206,7 +217,8 @@ function Install-Winget {
         $out = "$env:TEMP\Winget.msixbundle"
         Invoke-WebRequest -Uri $uri -OutFile $out
         Add-AppxPackage -Path $out
-    } catch {}
+        return $true
+    } catch { return $false }
 }
 
 function Install-Chocolatey {
@@ -214,7 +226,8 @@ function Install-Chocolatey {
         Set-ExecutionPolicy Bypass -Scope Process -Force
         [System.Net.ServicePointManager]::SecurityProtocol = [System.Net.ServicePointManager]::SecurityProtocol -bor 3072
         Invoke-Expression ((New-Object System.Net.WebClient).DownloadString('https://community.chocolatey.org/install.ps1'))
-    } catch {}
+        return $true
+    } catch { return $false }
 }
 
 function Install-Software {
@@ -222,16 +235,25 @@ function Install-Software {
     if (-not $bar -or -not $lbl) { return }
     $lbl.Text = "Instalando: $name..."
     $bar.Value = 10
+    
+    $success = $false
     if (Test-Winget) {
         $proc = Start-Process "winget" -ArgumentList "install", "--id", $id, "--accept-source-agreements", "--accept-package-agreements", "-h" -NoNewWindow -PassThru -Wait
-        if ($proc.ExitCode -eq 0) { $lbl.Text = "Completado: $name"; $bar.Value = 100; return }
+        if ($proc.ExitCode -eq 0) { $success = $true }
     }
-    if (Test-Chocolatey) {
+    
+    if (-not $success -and Test-Chocolatey) {
         $cid = $id.Split('.')[-1].ToLower()
         $proc = Start-Process "choco" -ArgumentList "install", $cid, "-y" -NoNewWindow -PassThru -Wait
-        if ($proc.ExitCode -eq 0) { $lbl.Text = "Completado: $name"; $bar.Value = 100; return }
+        if ($proc.ExitCode -eq 0) { $success = $true }
     }
-    $lbl.Text = "Falló: $name"
+    
+    if ($success) {
+        $lbl.Text = "Completado: $name"
+        $bar.Value = 100
+    } else {
+        $lbl.Text = "Error/Fallo: $name"
+    }
 }
 
 function Download-And-Install {
@@ -242,7 +264,10 @@ function Download-And-Install {
         $p = Start-Process $file -ArgumentList "/S", "/quiet" -PassThru
         $p.WaitForExit()
         $lbl.Text = "Completado: $name"
-    } catch { $lbl.Text = "Error: $name" }
+        $bar.Value = 100
+    } catch { 
+        $lbl.Text = "Error instalando: $name"
+    }
 }
 
 function Activate-WindowsAndOffice {
@@ -255,7 +280,7 @@ function Activate-WindowsAndOffice {
         $tmp = "$env:TEMP\act.cmd"
         "@echo off`nset _actwin=1`nset _actoff=1`ncall `"$scr`"" | Out-File $tmp -Encoding ASCII
         Start-Process "cmd.exe" -ArgumentList "/c", $tmp -Wait -NoNewWindow
-        [System.Windows.Forms.MessageBox]::Show("Proceso de activación finalizado.", "Shadowiex", 0, 64)
+        [System.Windows.Forms.MessageBox]::Show("Proceso finalizado.", "Shadowiex", 0, 64)
     } catch { [System.Windows.Forms.MessageBox]::Show($_.Exception.Message, "Error", 0, 16) }
 }
 
@@ -283,12 +308,49 @@ function Download-InstallersFromGitHub {
     } catch { [System.Windows.Forms.MessageBox]::Show($_.Exception.Message, "Error", 0, 16) }
 }
 
-# --- DATA SOFTWARE ---
+# --- DATA SOFTWARE COMPLETA ---
  $softwareCategories = @{
-    "Navegadores" = @(@{id="Google.Chrome";n="Google Chrome";i="🌐"}, @{id="Mozilla.Firefox";n="Firefox";i="🦊"})
-    "Utilidades"   = @(@{id="7zip.7zip";n="7-Zip";i="🗜️"}, @{id="Notepad++.Notepad++";n="Notepad++";i="📝"})
-    "Desarrollo"   = @(@{id="Git.Git";n="Git";i="📁"}, @{id="Microsoft.VisualStudioCode";n="VS Code";i="🔧"})
-    # Añade más categorías aquí...
+    "Navegadores" = @(
+        @{id="Google.Chrome";n="Google Chrome";i="🌐"},
+        @{id="Mozilla.Firefox";n="Mozilla Firefox";i="🦊"},
+        @{id="Opera.Opera";n="Opera GX";i="🎭"},
+        @{id="Microsoft.Edge";n="Microsoft Edge";i="🔵"},
+        @{id="BraveSoftware.BraveBrowser";n="Brave Browser";i="🦁"}
+    )
+    "Desarrollo" = @(
+        @{id="Git.Git";n="Git";i="📁"},
+        @{id="GitHub.GitHubDesktop";n="GitHub Desktop";i="🐙"},
+        @{id="Microsoft.VisualStudioCode";n="VS Code";i="🔧"},
+        @{id="Notepad++.Notepad++";n="Notepad++";i="📝"},
+        @{id="Python.Python.3";n="Python 3";i="🐍"}
+    )
+    "Multimedia" = @(
+        @{id="VideoLAN.VLC";n="VLC Media Player";i="🎵"},
+        @{id="GIMP.GIMP";n="GIMP";i="🎨"},
+        @{id="IrfanSkiljan.IrfanView";n="IrfanView";i="🖼️"},
+        @{id="Spotify.Spotify";n="Spotify";i="🎧"}
+    )
+    "Comunicación" = @(
+        @{id="Zoom.Zoom";n="Zoom";i="📞"},
+        @{id="Microsoft.Teams";n="Microsoft Teams";i="👥"},
+        @{id="Discord.Discord";n="Discord";i="💬"},
+        @{id="Telegram.TelegramDesktop";n="Telegram";i="📱"},
+        @{id="WhatsApp.WhatsApp";n="WhatsApp Desktop";i="💬"}
+    )
+    "Utilidades" = @(
+        @{id="7zip.7zip";n="7-Zip";i="🗜️"},
+        @{id="Adobe.Acrobat.Reader.64-bit";n="Adobe Reader";i="📄"},
+        @{id="RARLab.WinRAR";n="WinRAR";i="🗜️"},
+        @{id="TeamViewer.TeamViewer";n="TeamViewer";i="👥"},
+        @{id="Rufus.Rufus";n="Rufus";i="🔧"},
+        @{id="Balena.Etcher";n="Etcher";i="💾"}
+    )
+    "Runtimes" = @(
+        @{id="Oracle.JavaRuntimeEnvironment";n="Java Runtime";i="☕"},
+        @{id="Microsoft.DotNet.Runtime.6";n=".NET 6 Runtime";i="🟢"},
+        @{id="Microsoft.DotNet.Runtime.7";n=".NET 7 Runtime";i="🟢"},
+        @{id="Microsoft.VCRedist.2015+.x64";n="Visual C++ Redist";i="🔴"}
+    )
 }
 
 # --- POBLAR TABS ---
@@ -299,131 +361,190 @@ function Populate-SoftwareTab {
     # Panel Scroll
     $pnl = New-Object System.Windows.Forms.Panel
     $pnl.AutoScroll = $true
-    $pnl.Location = New-Object System.Drawing.Point(10, 50)
-    $pnl.Size = New-Object System.Drawing.Size(880, 400)
+    $pnl.Location = New-Object System.Drawing.Point(15, 50)
+    $pnl.Size = New-Object System.Drawing.Size(870, 360)
     $pnl.BackColor = $colors.Panel
+    $pnl.Padding = New-Object System.Windows.Forms.Padding(10)
     $tabBasicSoftware.Controls.Add($pnl)
 
     $global:allCheckboxes = @()
-    $y = 15
-    $font = New-Object System.Drawing.Font("Segoe UI", 9.5)
+    $y = 10
+    $font = New-Object System.Drawing.Font("Segoe UI", 10)
 
     foreach ($cat in $softwareCategories.Keys) {
         $lbl = Create-ModernLabel -text $cat -x 10 -y $y -isTitle $true
         $pnl.Controls.Add($lbl)
-        $y += 35
+        $y += 45
         foreach ($sw in $softwareCategories[$cat]) {
             $cb = New-Object System.Windows.Forms.CheckBox
-            $cb.Text = "$($sw.i) $($sw.n)"
+            $cb.Text = "$($sw.i)  $($sw.n)"
             $cb.Location = New-Object System.Drawing.Point(20, $y)
-            $cb.Size = New-Object System.Drawing.Size(400, 25)
+            $cb.Size = New-Object System.Drawing.Size(500, 30)
             $cb.Font = $font
             $cb.ForeColor = $colors.Text
             $cb.BackColor = $colors.Panel
+            $cb.Padding = New-Object System.Windows.Forms.Padding(5)
             $pnl.Controls.Add($cb)
             $global:allCheckboxes += @{cb=$cb; id=$sw.id; n=$sw.n}
-            $y += 30
+            $y += 35
         }
-        $y += 15
+        $y += 20
     }
 
-    # Botón Instalar
-    $btnInstall = Create-ModernButton -text "Instalar Selección" -x 10 -y 470 -width 200 -action {
+    # Botones de Acción
+    $btnInstall = Create-ModernButton -text "Instalar Selección" -x 15 -y 425 -width 220 -action {
         $sel = $global:allCheckboxes | Where-Object { $_.cb.Checked }
-        if ($sel.Count -eq 0) { [System.Windows.Forms.MessageBox]::Show("Selecciona algo.", "Info", 0, 48); return }
-        if (-not (Test-Winget)) { Install-Winget }
+        if ($sel.Count -eq 0) { [System.Windows.Forms.MessageBox]::Show("Por favor seleccione software.", "Info", 0, 48); return }
+        if (-not (Test-Winget) -and -not (Test-Chocolatey)) { 
+            if (-not (Install-Winget)) { Install-Chocolatey }
+        }
         
-        # Progreso
+        # Formulario de Progreso
         $pf = New-Object System.Windows.Forms.Form
-        $pf.Text = "Instalando..."
-        $pf.Size = New-Object System.Drawing.Size(400, 120)
+        $pf.Text = "Progreso de Instalación"
+        $pf.Size = New-Object System.Drawing.Size(450, 130)
         $pf.BackColor = $colors.Background
         $pf.StartPosition = "CenterParent"
         $pf.FormBorderStyle = "FixedDialog"
         $l = Create-ModernLabel -text "Iniciando..." -x 20 -y 20
-        $b = New-Object System.Windows.Forms.ProgressBar; $b.Location = "20, 50"; $b.Width = 350
+        $b = New-Object System.Windows.Forms.ProgressBar; $b.Location = "20, 50"; $b.Width = 390; $b.Style = "Continuous"
         $pf.Controls.AddRange(@($l, $b))
         $pf.Show()
 
-        foreach ($s in $sel) { Install-Software -id $s.id -name $s.n -bar $b -lbl $l }
+        foreach ($s in $sel) { 
+            $pf.Refresh()
+            Install-Software -id $s.id -name $s.n -bar $b -lbl $l 
+        }
         $pf.Close()
-        [System.Windows.Forms.MessageBox]::Show("Fin.", "Shadowiex", 0, 64)
+        [System.Windows.Forms.MessageBox]::Show("Instalación finalizada.", "Shadowiex", 0, 64)
     }
     $tabBasicSoftware.Controls.Add($btnInstall)
     
-    $btnSelAll = Create-ModernButton -text "Seleccionar Todo" -x 230 -y 470 -width 150 -backColor $colors.Panel -action {
+    $btnSelAll = Create-ModernButton -text "Seleccionar Todo" -x 255 -y 425 -width 160 -backColor $colors.Panel -action {
         foreach($i in $global:allCheckboxes){ $i.cb.Checked = $true }
     }
     $tabBasicSoftware.Controls.Add($btnSelAll)
+    
+    $btnDesel = Create-ModernButton -text "Deseleccionar" -x 425 -y 425 -width 160 -backColor $colors.Panel -action {
+        foreach($i in $global:allCheckboxes){ $i.cb.Checked = $false }
+    }
+    $tabBasicSoftware.Controls.Add($btnDesel)
 }
 
 function Populate-InstallersTab {
     $tabInstallers.Controls.Clear()
-    $lblTitle = Create-ModernLabel -text "Gestor de Instaladores Offline" -x 10 -y 10 -isTitle $true
+    $lblTitle = Create-ModernLabel -text "Gestor de Instaladores Personalizados" -x 15 -y 10 -isTitle $true
     $tabInstallers.Controls.Add($lblTitle)
 
     $list = New-Object System.Windows.Forms.ListBox
-    $list.Location = "10, 50"
-    $list.Size = "600, 300"
+    $list.Location = "15, 60"
+    $list.Size = "600, 320"
     $list.BackColor = $colors.Panel
     $list.ForeColor = $colors.Text
-    $list.Font = New-Object System.Drawing.Font("Segoe UI", 9.5)
+    $list.Font = New-Object System.Drawing.Font("Segoe UI", 10)
+    $list.HorizontalScrollbar = $true
     $tabInstallers.Controls.Add($list)
     $script:UIControls['List'] = $list
 
-    $btnRefresh = Create-ModernButton -text "Actualizar Lista" -x 630 -y 50 -width 150 -action {
-        $l = $script:UIControls['List']; $l.Items.Clear()
-        foreach($f in Initialize-Installers){ $l.Items.Add($f.Name) }
+    # Función Local para refrescar
+    $refreshAction = {
+        $l = $script:UIControls['List']; 
+        if($l){ 
+            $l.Items.Clear()
+            foreach($f in Initialize-Installers){ $l.Items.Add($f.Name) }
+        }
     }
+
+    $btnRefresh = Create-ModernButton -text "Actualizar Lista" -x 630 -y 60 -width 160 -action $refreshAction
     $tabInstallers.Controls.Add($btnRefresh)
 
-    $btnDl = Create-ModernButton -text "Descargar de GitHub" -x 630 -y 100 -width 150 -action {
+    $btnDl = Create-ModernButton -text "Descargar de GitHub" -x 630 -y 115 -width 160 -action {
         Download-InstallersFromGitHub -dest (if($PSScriptRoot){$PSScriptRoot}else{$PWD.Path})
-        Start-Sleep 1; & $btnRefresh.PerformClick() # Trick to refresh
-        $l = $script:UIControls['List']; $l.Items.Clear()
-        foreach($f in Initialize-Installers){ $l.Items.Add($f.Name) }
+        # Ejecutar refresco manualmente después de la descarga
+        Start-Sleep -Seconds 1
+        & $refreshAction
     }
     $tabInstallers.Controls.Add($btnDl)
+    
+    $btnInstall = Create-ModernButton -text "Instalar Seleccionado" -x 15 -y 400 -width 200 -action {
+        $l = $script:UIControls['List']
+        if($l.SelectedIndex -eq -1) { [System.Windows.Forms.MessageBox]::Show("Seleccione un instalador.", "Info", 0, 48); return }
+        
+        # Instalación simple
+        $itemName = $l.SelectedItem
+        $root = if ($PSScriptRoot) { $PSScriptRoot } else { $PWD.Path }
+        $file = Join-Path (Join-Path $root "instaladores") $itemName
+        
+        if (Test-Path $file) {
+            Start-Process $file -ArgumentList "/S" -Wait
+            [System.Windows.Forms.MessageBox]::Show("Instalador ejecutado.", "Listo", 0, 64)
+        } else {
+            [System.Windows.Forms.MessageBox]::Show("Archivo no encontrado.", "Error", 0, 16)
+        }
+    }
+    $tabInstallers.Controls.Add($btnInstall)
 }
 
 function Populate-ActivationsTab {
     $tabActivations.Controls.Clear()
     
-    # Grid Layout Buttons
-    $btnAct = Create-ModernButton -text "Activar Windows y Office" -x 20 -y 50 -width 220 -action { Activate-WindowsAndOffice }
+    $btnAct = Create-ModernButton -text "Activar Windows y Office" -x 20 -y 60 -width 240 -backColor $colors.Success -action { Activate-WindowsAndOffice }
     $tabActivations.Controls.Add($btnAct)
 
-    $btnWin = Create-ModernButton -text "Script Activated.Win" -x 260 -y 50 -width 220 -action {
-        try { iex(iwr "https://get.activated.win") } catch { [System.Windows.Forms.MessageBox]::Show("Error", "Err", 0, 16) }
+    $btnWin = Create-ModernButton -text "Script Activated.Win" -x 280 -y 60 -width 240 -action {
+        try { iex(iwr "https://get.activated.win") } catch { [System.Windows.Forms.MessageBox]::Show("Error ejecutando script.", "Err", 0, 16) }
     }
     $tabActivations.Controls.Add($btnWin)
 
-    $btnTitus = Create-ModernButton -text "Script Chris Titus" -x 500 -y 50 -width 220 -action {
-        try { iex(iwr "https://christitus.com/win") } catch { [System.Windows.Forms.MessageBox]::Show("Error", "Err", 0, 16) }
+    $btnTitus = Create-ModernButton -text "WinUtil (Chris Titus)" -x 540 -y 60 -width 240 -action {
+        try { iwr -useb "https://christitus.com/win" | iex } catch { [System.Windows.Forms.MessageBox]::Show("Error ejecutando script.", "Err", 0, 16) }
     }
     $tabActivations.Controls.Add($btnTitus)
-
-    $lblInfo = Create-ModernLabel -text "Sistema optimizado." -x 20 -y 150 -width 800 -isTitle $false
-    $tabActivations.Controls.Add($lblInfo)
+    
+    # Botones de Optimización
+    $lblOpt = Create-ModernLabel -text "Optimización del Sistema" -x 20 -y 140 -isTitle $true
+    $tabActivations.Controls.Add($lblOpt)
+    
+    $btnNet = Create-ModernButton -text "Optimizar Red" -x 20 -y 190 -width 180 -action {
+        netsh int ip reset; netsh winsock reset; ipconfig /flushdns; [System.Windows.Forms.MessageBox]::Show("Red optimizada.", "Listo", 0, 64)
+    }
+    $tabActivations.Controls.Add($btnNet)
+    
+    $btnSys = Create-ModernButton -text "Optimizar Servicios" -x 220 -y 190 -width 180 -action {
+        $srv = "DiagTrack","dmwappushservice","MapsBroker","SharedAccess"
+        foreach($s in $srv){ Set-Service $s -StartupType Disabled -EA SilentlyContinue; Stop-Service $s -Force -EA SilentlyContinue }
+        [System.Windows.Forms.MessageBox]::Show("Servicios deshabilitados.", "Listo", 0, 64)
+    }
+    $tabActivations.Controls.Add($btnSys)
+    
+    $btnClean = Create-ModernButton -text "Limpiar Temporales" -x 420 -y 190 -width 180 -backColor $colors.Warning -action {
+        Remove-Item "$env:TEMP\*" -Recurse -Force -EA SilentlyContinue
+        Remove-Item "$env:windir\Temp\*" -Recurse -Force -EA SilentlyContinue
+        [System.Windows.Forms.MessageBox]::Show("Archivos temporales limpiados.", "Listo", 0, 64)
+    }
+    $tabActivations.Controls.Add($btnClean)
 }
 
 function Populate-SettingsTab {
     $tabSettings.Controls.Clear()
-    $lbl = Create-ModernLabel -text "Preferencias del Sistema" -x 10 -y 10 -isTitle $true
+    $lbl = Create-ModernLabel -text "Configuración de Herramientas" -x 20 -y 20 -isTitle $true
     $tabSettings.Controls.Add($lbl)
     
-    $lblWg = Create-ModernLabel -text "Winget: $(if(Test-Winget){'Instalado'}else{'No instalado'})" -x 20 -y 60
-    $tabSettings.Controls.Add($lblWg)
+    $statusW = "Estado Winget: $(if(Test-Winget){'Instalado'}else{'No Encontrado'})"
+    $statusC = "Estado Chocolatey: $(if(Test-Chocolatey){'Instalado'}else{'No Encontrado'})"
+    
+    $tabSettings.Controls.Add((Create-ModernLabel -text $statusW -x 20 -y 80))
+    $tabSettings.Controls.Add((Create-ModernLabel -text $statusC -x 20 -y 120))
 
-    $btnUp = Create-ModernButton -text "Actualizar Script" -x 20 -y 120 -width 200 -action {
+    $btnUp = Create-ModernButton -text "Actualizar Script" -x 20 -y 180 -width 220 -action {
         try {
             $u = "https://github.com/WalterShadow2001/shadowiex/raw/main/Shadowiex.ps1"
             $t = "$env:TEMP\Shadowiex.ps1"
-            iwr $u -OutFile $t
+            Invoke-WebRequest -Uri $u -OutFile $t
             Copy-Item $t $PSCommandPath -Force
-            [System.Windows.Forms.MessageBox]::Show("Actualizado. Reinicia.", "Info", 0, 64)
+            [System.Windows.Forms.MessageBox]::Show("Script actualizado. Por favor reinicie.", "Info", 0, 64)
             $form.Close()
-        } catch { [System.Windows.Forms.MessageBox]::Show("Error", "Err", 0, 16) }
+        } catch { [System.Windows.Forms.MessageBox]::Show("Error al actualizar.", "Err", 0, 16) }
     }
     $tabSettings.Controls.Add($btnUp)
 }
@@ -433,11 +554,5 @@ Populate-SoftwareTab
 Populate-InstallersTab
 Populate-ActivationsTab
 Populate-SettingsTab
-
-# Fix para el botón de refresco en Installers (referencia tardía)
- $tabInstallers.Controls[2].Add_Click({
-    $l = $script:UIControls['List']; $l.Items.Clear()
-    foreach($f in Initialize-Installers){ $l.Items.Add($f.Name) }
-}).GetNewClosure()
 
 [void]$form.ShowDialog()
