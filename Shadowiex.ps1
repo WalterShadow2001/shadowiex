@@ -1,19 +1,19 @@
 <#
 .SYNOPSIS
-    Shadowiex - Professional Edition (Sintaxis Segura)
+    Shadowiex - Professional Edition (Final Fix)
 .DESCRIPTION
-    Funciones definidas al inicio para evitar errores de parser. Lógica de instalación simplificada.
+    Version limpia con funciones definidas al inicio y lógica de instalación simplificada para evitar errores de parser.
 .NOTES
     Autor: WalterShadow2001
-    Versión: 4.3 - Syntax Safe
+    Versión: 5.0 - Local Run Only
 #>
 
-# --- CONFIGURACIÓN Y DEFINICIONES INICIALES (MOVIDAS ARRIBA) ---
+# --- CONFIGURACIÓN Y DEFINICIONES INICIALES ---
  $ErrorActionPreference = "Stop"
  $ProgressPreference = 'SilentlyContinue'
  $script:UIControls = @{}
 
-# Funciones de Verificación (Definidas PRIMERO para evitar errores de parser)
+# DEFINICIÓN DE FUNCIONES AL INICIO (Evita errores de Parser)
 function Test-Winget { 
     try { $null = winget --version; return $true } 
     catch { return $false } 
@@ -200,7 +200,7 @@ function Create-ModernLabel {
     return $label
 }
 
-# --- LÓGICA DE INSTALACIÓN (CORREGIDA) ---
+# --- LÓGICA DE INSTALACIÓN (SIMPLIFICADA Y SEGURA) ---
 
 function Install-Winget {
     try {
@@ -229,15 +229,18 @@ function Install-Software {
     
     $success = $false
     
-    # Intentar Winget
-    if (Test-Winget) {
+    # Lógica Separada para evitar errores de sintaxis compleja
+    $hasWinget = Test-Winget
+    $hasChoco = Test-Chocolatey
+
+    if ($hasWinget) {
         $proc = Start-Process "winget" -ArgumentList "install", "--id", $id, "--accept-source-agreements", "--accept-package-agreements", "-h" -NoNewWindow -PassThru -Wait
         if ($proc.ExitCode -eq 0) { $success = $true }
     }
     
-    # Intentar Chocolatey SOLO si Winget falló (Lógica separada para evitar errores de parser)
+    # Segunda pasada, solo si la primera falló
     if ($success -eq $false) {
-        if (Test-Chocolatey) {
+        if ($hasChoco) {
             $cid = $id.Split('.')[-1].ToLower()
             $proc = Start-Process "choco" -ArgumentList "install", $cid, "-y" -NoNewWindow -PassThru -Wait
             if ($proc.ExitCode -eq 0) { $success = $true }
@@ -302,7 +305,7 @@ function Download-InstallersFromGitHub {
     } catch { [System.Windows.Forms.MessageBox]::Show($_.Exception.Message, "Error", 0, 16) }
 }
 
-# --- DATA SOFTWARE ---
+# --- DATA SOFTWARE COMPLETA ---
  $softwareCategories = @{
     "Navegadores" = @(
         @{id="Google.Chrome";n="Google Chrome";i="🌐"},
@@ -394,6 +397,7 @@ function Populate-SoftwareTab {
         $sel = $global:allCheckboxes | Where-Object { $_.cb.Checked }
         if ($sel.Count -eq 0) { [System.Windows.Forms.MessageBox]::Show("Seleccione software.", "Info", 0, 48); return }
         
+        # Verificar instaladores
         $wg = Test-Winget; $ch = Test-Chocolatey
         if (-not $wg -and -not $ch) { 
             if (-not (Install-Winget)) { Install-Chocolatey }
