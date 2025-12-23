@@ -59,24 +59,13 @@ class InstallationState {
  $form.BackColor = [System.Drawing.Color]::FromArgb(25, 25, 35)
  $form.ForeColor = [System.Drawing.Color]::White
 
-# Añadir logo con manejo de errores mejorado
+# Añadir logo desde el repositorio
 try {
-    # Buscar logo en múltiples ubicaciones
-    $logoPaths = @(
-        Join-Path -Path $PSScriptRoot -ChildPath "SHADOWIEX_LOGO.png",
-        Join-Path -Path $PSScriptRoot -ChildPath "logo.png",
-        Join-Path -Path $PSScriptRoot -ChildPath "Shadowiex_Logo.png"
-    )
+    # Buscar logo en el repositorio
+    $logoPath = Join-Path -Path $PSScriptRoot -ChildPath "SHADOWIEX_LOGO.png"
     
-    $logoImage = $null
-    foreach ($path in $logoPaths) {
-        if (Test-Path -Path $path) {
-            $logoImage = [System.Drawing.Image]::FromFile($path)
-            break
-        }
-    }
-    
-    if ($logoImage) {
+    if (Test-Path -Path $logoPath) {
+        $logoImage = [System.Drawing.Image]::FromFile($logoPath)
         $pictureBox = New-Object System.Windows.Forms.PictureBox
         $pictureBox.Image = $logoImage
         $pictureBox.Size = New-Object System.Drawing.Size(32, 32)
@@ -104,11 +93,11 @@ catch {
     $form.Controls.Add($pictureBox)
 }
 
-# Añadir texto "CREADO POR WDPN" debajo del botón de actualización en la esquina inferior derecha
+# Añadir texto "CREADO POR WDPN" en la esquina inferior derecha
  $createdByLabel = New-Object System.Windows.Forms.Label
  $createdByLabel.Text = "CREADO POR WDPN"
- $createdByLabel.Location = New-Object System.Drawing.Point(750, 540)  # Ajustado para estar debajo de algún botón
- $createdByLabel.Size = New-Object System.Drawing.Size(130, 20)
+ $createdByLabel.Location = New-Object System.Drawing.Point(820, 560)  # Esquina inferior derecha
+ $createdByLabel.Size = New-Object System.Drawing.Size(70, 20)
  $createdByLabel.ForeColor = [System.Drawing.Color]::FromArgb(150, 150, 150)  # Color gris claro
  $createdByLabel.Font = New-Object System.Drawing.Font("Segoe UI", 8)
  $form.Controls.Add($createdByLabel)
