@@ -1,14 +1,15 @@
 <#
 .SYNOPSIS
-    Shadowiex - Professional Edition (Fix Font Style)
+    Shadowiex - Professional Edition (GitHub / Web Ready)
 .DESCRIPTION
-    Versión corregida. "Semibold" cambiado a "Bold" para compatibilidad con .NET.
+    Versión optimizada para ejecución vía "irm | iex". 
+    Corrección de fuentes mediante variable separada para máxima compatibilidad.
 .NOTES
     Autor: WalterShadow2001
-    Versión: 5.2 - Font Fix
+    Versión: 6.0 - Web Safe
 #>
 
-# --- CONFIGURACIÓN Y DEFINICIONES INICIALES ---
+# --- CONFIGURACIÓN INICIAL ---
  $ErrorActionPreference = "Stop"
  $ProgressPreference = 'SilentlyContinue'
  $script:UIControls = @{}
@@ -36,6 +37,11 @@ function Test-Chocolatey {
     Warning     = [System.Drawing.Color]::FromArgb(245, 159, 0)
     Danger      = [System.Drawing.Color]::FromArgb(239, 68, 68)
 }
+
+# Estilos de Fuente (Variables separadas para evitar errores de Parser al ejecutar desde web)
+ $styleBold = [System.Drawing.FontStyle]::Bold
+ $styleRegular = [System.Drawing.FontStyle]::Regular
+ $styleItalic = [System.Drawing.FontStyle]::Italic
 
 # Verificación de Administrador
 function Test-Administrator {
@@ -83,7 +89,8 @@ try {
         $titleLabel.Text = "Shadowiex Professional"
         $titleLabel.Location = New-Object System.Drawing.Point(80, 25)
         $titleLabel.Size = New-Object System.Drawing.Size(300, 35)
-        $titleLabel.Font = New-Object System.Drawing.Font("Segoe UI", 16, [System.Drawing.FontStyle]::Bold)
+        # Uso de variable de estilo
+        $titleLabel.Font = New-Object System.Drawing.Font("Segoe UI", 16, $styleBold)
         $titleLabel.ForeColor = $colors.Text
         $form.Controls.Add($titleLabel)
     }
@@ -96,7 +103,7 @@ catch {}
  $footerLabel.Location = New-Object System.Drawing.Point(20, 600)
  $footerLabel.Size = New-Object System.Drawing.Size(250, 30)
  $footerLabel.ForeColor = $colors.TextSub
- $footerLabel.Font = New-Object System.Drawing.Font("Segoe UI", 10, [System.Drawing.FontStyle]::Italic)
+ $footerLabel.Font = New-Object System.Drawing.Font("Segoe UI", 10, $styleItalic)
  $form.Controls.Add($footerLabel)
 
 # --- PESTAÑAS ---
@@ -106,7 +113,7 @@ catch {}
  $tabControl.BackColor = $colors.Background
  $tabControl.Appearance = [System.Windows.Forms.TabAppearance]::Buttons
  $tabControl.ItemSize = New-Object System.Drawing.Size(150, 40)
- $tabControl.Font = New-Object System.Drawing.Font("Segoe UI", 10.5, [System.Drawing.FontStyle]::Bold)
+ $tabControl.Font = New-Object System.Drawing.Font("Segoe UI", 10.5, $styleBold)
  $tabControl.Padding = New-Object System.Drawing.Point(10, 5)
 
  $tabBasicSoftware = New-Object System.Windows.Forms.TabPage
@@ -157,8 +164,8 @@ function Create-ModernButton {
     $button.BackColor = $btnColor
     $button.ForeColor = [System.Drawing.Color]::White
     $button.FlatStyle = [System.Windows.Forms.FlatStyle]::Flat
-    # CORRECCIÓN: Cambiado Semibold por Bold (Semibold no existe en enum base de .NET)
-    $button.Font = New-Object System.Drawing.Font("Segoe UI", 10, [System.Drawing.FontStyle]::Bold)
+    # Uso de variable de estilo (Bold)
+    $button.Font = New-Object System.Drawing.Font("Segoe UI", 10, $styleBold)
     $button.Cursor = [System.Windows.Forms.Cursors]::Hand
     $button.FlatAppearance.BorderSize = 0
     
@@ -194,9 +201,9 @@ function Create-ModernLabel {
     $label.ForeColor = $colors.Text
     
     if ($isTitle) {
-        $label.Font = New-Object System.Drawing.Font("Segoe UI", 13, [System.Drawing.FontStyle]::Bold)
+        $label.Font = New-Object System.Drawing.Font("Segoe UI", 13, $styleBold)
     } else {
-        $label.Font = New-Object System.Drawing.Font("Segoe UI", 10)
+        $label.Font = New-Object System.Drawing.Font("Segoe UI", 10, $styleRegular)
     }
     return $label
 }
@@ -370,7 +377,7 @@ function Populate-SoftwareTab {
 
     $global:allCheckboxes = @()
     $y = 10
-    $font = New-Object System.Drawing.Font("Segoe UI", 10)
+    $font = New-Object System.Drawing.Font("Segoe UI", 10, $styleRegular)
 
     foreach ($cat in $softwareCategories.Keys) {
         $lbl = Create-ModernLabel -text $cat -x 10 -y $y -isTitle $true
@@ -442,7 +449,7 @@ function Populate-InstallersTab {
     $list.Size = "600, 320"
     $list.BackColor = $colors.Panel
     $list.ForeColor = $colors.Text
-    $list.Font = New-Object System.Drawing.Font("Segoe UI", 10)
+    $list.Font = New-Object System.Drawing.Font("Segoe UI", 10, $styleRegular)
     $list.HorizontalScrollbar = $true
     $tabInstallers.Controls.Add($list)
     $script:UIControls['List'] = $list
