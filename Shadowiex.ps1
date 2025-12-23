@@ -1,11 +1,11 @@
 <#
 .SYNOPSIS
-    Shadowiex - Professional Edition (Fix NULL Color Type)
+    Shadowiex - Professional Edition (Fix Font Style)
 .DESCRIPTION
-    Versión corregida para PowerShell 5.1. Parámetros de color flexibles y definiciones seguras.
+    Versión corregida. "Semibold" cambiado a "Bold" para compatibilidad con .NET.
 .NOTES
     Autor: WalterShadow2001
-    Versión: 5.1 - Type Safe
+    Versión: 5.2 - Font Fix
 #>
 
 # --- CONFIGURACIÓN Y DEFINICIONES INICIALES ---
@@ -145,7 +145,6 @@ function Create-ModernButton {
         [int]$width = 190,
         [int]$height = 45,
         [scriptblock]$action,
-        # CORRECCIÓN CRÍTICA: [object] permite NULL sin errores en PS 5.1
         [object]$backColor = $null
     )
     
@@ -158,7 +157,8 @@ function Create-ModernButton {
     $button.BackColor = $btnColor
     $button.ForeColor = [System.Drawing.Color]::White
     $button.FlatStyle = [System.Windows.Forms.FlatStyle]::Flat
-    $button.Font = New-Object System.Drawing.Font("Segoe UI", 10, [System.Drawing.FontStyle]::Semibold)
+    # CORRECCIÓN: Cambiado Semibold por Bold (Semibold no existe en enum base de .NET)
+    $button.Font = New-Object System.Drawing.Font("Segoe UI", 10, [System.Drawing.FontStyle]::Bold)
     $button.Cursor = [System.Windows.Forms.Cursors]::Hand
     $button.FlatAppearance.BorderSize = 0
     
