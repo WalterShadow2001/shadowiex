@@ -1,19 +1,30 @@
 <#
 .SYNOPSIS
-    Shadowiex - Professional Edition (UI Moderna y Corregida)
+    Shadowiex - Professional Edition (Sintaxis Segura)
 .DESCRIPTION
-    Versión definitiva con diseño "Dark Glass", manejo de errores robusto y lista completa de software estilo Chris Titus.
+    Funciones definidas al inicio para evitar errores de parser. Lógica de instalación simplificada.
 .NOTES
     Autor: WalterShadow2001
-    Versión: 4.2 - Final Fix
+    Versión: 4.3 - Syntax Safe
 #>
 
-# --- CONFIGURACIÓN ---
+# --- CONFIGURACIÓN Y DEFINICIONES INICIALES (MOVIDAS ARRIBA) ---
  $ErrorActionPreference = "Stop"
  $ProgressPreference = 'SilentlyContinue'
  $script:UIControls = @{}
 
-# Paleta de Colores
+# Funciones de Verificación (Definidas PRIMERO para evitar errores de parser)
+function Test-Winget { 
+    try { $null = winget --version; return $true } 
+    catch { return $false } 
+}
+
+function Test-Chocolatey { 
+    try { $null = choco --version; return $true } 
+    catch { return $false } 
+}
+
+# Colores
  $colors = @{
     Background  = [System.Drawing.Color]::FromArgb(30, 30, 40)
     Panel       = [System.Drawing.Color]::FromArgb(45, 45, 55)
@@ -26,7 +37,7 @@
     Danger      = [System.Drawing.Color]::FromArgb(239, 68, 68)
 }
 
-# Administrador
+# Verificación de Administrador
 function Test-Administrator {
     $currentUser = [Security.Principal.WindowsIdentity]::GetCurrent()
     $principal = New-Object Security.Principal.WindowsPrincipal($currentUser)
@@ -54,14 +65,9 @@ Add-Type -AssemblyName System.Management.Automation
 # --- LOGO E ICONO ---
 try {
     $scriptRoot = if ($PSScriptRoot) { $PSScriptRoot } else { $PWD.Path }
-    
-    # Icono ventana
     $iconPath = Join-Path -Path $scriptRoot -ChildPath "SHADOWIEX_LOGO.ico"
-    if (Test-Path -Path $iconPath) {
-        $form.Icon = [System.Drawing.Icon]::ExtractAssociatedIcon($iconPath)
-    }
+    if (Test-Path -Path $iconPath) { $form.Icon = [System.Drawing.Icon]::ExtractAssociatedIcon($iconPath) }
 
-    # Logo Header
     $logoPath = Join-Path -Path $scriptRoot -ChildPath "SHADOWIEX_LOGO.png"
     if (Test-Path -Path $logoPath) {
         $logoImage = [System.Drawing.Image]::FromFile($logoPath)
@@ -79,13 +85,6 @@ try {
         $titleLabel.Size = New-Object System.Drawing.Size(300, 35)
         $titleLabel.Font = New-Object System.Drawing.Font("Segoe UI", 16, [System.Drawing.FontStyle]::Bold)
         $titleLabel.ForeColor = $colors.Text
-        $form.Controls.Add($titleLabel)
-    } else {
-        $titleLabel = New-Object System.Windows.Forms.Label
-        $titleLabel.Text = "Shadowiex Professional"
-        $titleLabel.Location = New-Object System.Drawing.Point(20, 25)
-        $titleLabel.Size = New-Object System.Drawing.Size(300, 35)
-        $titleLabel.Font = New-Object System.Drawing.Font("Segoe UI", 16, [System.Drawing.FontStyle]::Bold)
         $form.Controls.Add($titleLabel)
     }
 }
@@ -136,7 +135,7 @@ catch {}
  $tabControl.Controls.Add($tabSettings)
  $form.Controls.Add($tabControl)
 
-# --- FUNCIONES UI HELPER (Sintaxis Segura) ---
+# --- FUNCIONES UI HELPER ---
 
 function Create-ModernButton {
     param (
@@ -165,7 +164,6 @@ function Create-ModernButton {
     if ($null -eq $backColor) {
         $button.FlatAppearance.MouseOverBackColor = $colors.AccentHover
     } else {
-        # Oscurecer color manualmente
         $r = [Math]::Max(0, $backColor.R - 20)
         $g = [Math]::Max(0, $backColor.G - 20)
         $b = [Math]::Max(0, $backColor.B - 20)
@@ -185,7 +183,6 @@ function Create-ModernLabel {
         [bool]$isTitle = $false
     )
     
-    # Calcular altura de forma segura
     $labelHeight = 25
     if ($isTitle) { $labelHeight = 35 }
     
@@ -203,9 +200,7 @@ function Create-ModernLabel {
     return $label
 }
 
-# --- LÓGICA DE SOFTWARE ---
-function Test-Winget { try { $null = winget --version; return $true } catch { return $false } }
-function Test-Chocolatey { try { $null = choco --version; return $true } catch { return $false } }
+# --- LÓGICA DE INSTALACIÓN (CORREGIDA) ---
 
 function Install-Winget {
     try {
@@ -233,15 +228,20 @@ function Install-Software {
     $bar.Value = 10
     
     $success = $false
+    
+    # Intentar Winget
     if (Test-Winget) {
         $proc = Start-Process "winget" -ArgumentList "install", "--id", $id, "--accept-source-agreements", "--accept-package-agreements", "-h" -NoNewWindow -PassThru -Wait
         if ($proc.ExitCode -eq 0) { $success = $true }
     }
     
-    if (-not $success -and Test-Chocolatey) {
-        $cid = $id.Split('.')[-1].ToLower()
-        $proc = Start-Process "choco" -ArgumentList "install", $cid, "-y" -NoNewWindow -PassThru -Wait
-        if ($proc.ExitCode -eq 0) { $success = $true }
+    # Intentar Chocolatey SOLO si Winget falló (Lógica separada para evitar errores de parser)
+    if ($success -eq $false) {
+        if (Test-Chocolatey) {
+            $cid = $id.Split('.')[-1].ToLower()
+            $proc = Start-Process "choco" -ArgumentList "install", $cid, "-y" -NoNewWindow -PassThru -Wait
+            if ($proc.ExitCode -eq 0) { $success = $true }
+        }
     }
     
     if ($success) {
@@ -302,7 +302,7 @@ function Download-InstallersFromGitHub {
     } catch { [System.Windows.Forms.MessageBox]::Show($_.Exception.Message, "Error", 0, 16) }
 }
 
-# --- DATA SOFTWARE COMPLETA ---
+# --- DATA SOFTWARE ---
  $softwareCategories = @{
     "Navegadores" = @(
         @{id="Google.Chrome";n="Google Chrome";i="🌐"},
@@ -390,11 +390,12 @@ function Populate-SoftwareTab {
         $y += 20
     }
 
-    # Botones
     $btnInstall = Create-ModernButton -text "Instalar Selección" -x 15 -y 425 -width 220 -action {
         $sel = $global:allCheckboxes | Where-Object { $_.cb.Checked }
         if ($sel.Count -eq 0) { [System.Windows.Forms.MessageBox]::Show("Seleccione software.", "Info", 0, 48); return }
-        if (-not (Test-Winget) -and -not (Test-Chocolatey)) { 
+        
+        $wg = Test-Winget; $ch = Test-Chocolatey
+        if (-not $wg -and -not $ch) { 
             if (-not (Install-Winget)) { Install-Chocolatey }
         }
         
@@ -444,7 +445,6 @@ function Populate-InstallersTab {
     $tabInstallers.Controls.Add($list)
     $script:UIControls['List'] = $list
 
-    # Acción de refresco
     $refreshAction = {
         $l = $script:UIControls['List']; 
         if($l){ 
