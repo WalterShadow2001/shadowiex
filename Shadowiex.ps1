@@ -104,11 +104,11 @@ catch {
     $form.Controls.Add($pictureBox)
 }
 
-# Añadir texto "CREADO POR WDPN" en la esquina inferior derecha
+# Añadir texto "CREADO POR WDPN" debajo del botón de actualización en la esquina inferior derecha
  $createdByLabel = New-Object System.Windows.Forms.Label
  $createdByLabel.Text = "CREADO POR WDPN"
- $createdByLabel.Location = New-Object System.Drawing.Point(820, 560)  # Esquina inferior derecha
- $createdByLabel.Size = New-Object System.Drawing.Size(70, 20)
+ $createdByLabel.Location = New-Object System.Drawing.Point(750, 540)  # Ajustado para estar debajo de algún botón
+ $createdByLabel.Size = New-Object System.Drawing.Size(130, 20)
  $createdByLabel.ForeColor = [System.Drawing.Color]::FromArgb(150, 150, 150)  # Color gris claro
  $createdByLabel.Font = New-Object System.Drawing.Font("Segoe UI", 8)
  $form.Controls.Add($createdByLabel)
