@@ -1,11 +1,11 @@
 <#
 .SYNOPSIS
-    Shadowiex - Professional Edition (Final Fix)
+    Shadowiex - Professional Edition (Fix NULL Color Type)
 .DESCRIPTION
-    Version limpia con funciones definidas al inicio y lógica de instalación simplificada para evitar errores de parser.
+    Versión corregida para PowerShell 5.1. Parámetros de color flexibles y definiciones seguras.
 .NOTES
     Autor: WalterShadow2001
-    Versión: 5.0 - Local Run Only
+    Versión: 5.1 - Type Safe
 #>
 
 # --- CONFIGURACIÓN Y DEFINICIONES INICIALES ---
@@ -13,7 +13,7 @@
  $ProgressPreference = 'SilentlyContinue'
  $script:UIControls = @{}
 
-# DEFINICIÓN DE FUNCIONES AL INICIO (Evita errores de Parser)
+# Funciones de Verificación (Definidas PRIMERO)
 function Test-Winget { 
     try { $null = winget --version; return $true } 
     catch { return $false } 
@@ -145,7 +145,8 @@ function Create-ModernButton {
         [int]$width = 190,
         [int]$height = 45,
         [scriptblock]$action,
-        [System.Drawing.Color]$backColor = $null
+        # CORRECCIÓN: Cambiado de [System.Drawing.Color] a [object] para evitar el error de conversión NULL
+        [object]$backColor = $null
     )
     
     if ($null -eq $backColor) { $btnColor = $colors.Accent } else { $btnColor = $backColor }
@@ -200,7 +201,7 @@ function Create-ModernLabel {
     return $label
 }
 
-# --- LÓGICA DE INSTALACIÓN (SIMPLIFICADA Y SEGURA) ---
+# --- LÓGICA DE INSTALACIÓN ---
 
 function Install-Winget {
     try {
@@ -229,7 +230,6 @@ function Install-Software {
     
     $success = $false
     
-    # Lógica Separada para evitar errores de sintaxis compleja
     $hasWinget = Test-Winget
     $hasChoco = Test-Chocolatey
 
@@ -238,7 +238,6 @@ function Install-Software {
         if ($proc.ExitCode -eq 0) { $success = $true }
     }
     
-    # Segunda pasada, solo si la primera falló
     if ($success -eq $false) {
         if ($hasChoco) {
             $cid = $id.Split('.')[-1].ToLower()
@@ -305,7 +304,7 @@ function Download-InstallersFromGitHub {
     } catch { [System.Windows.Forms.MessageBox]::Show($_.Exception.Message, "Error", 0, 16) }
 }
 
-# --- DATA SOFTWARE COMPLETA ---
+# --- DATA SOFTWARE ---
  $softwareCategories = @{
     "Navegadores" = @(
         @{id="Google.Chrome";n="Google Chrome";i="🌐"},
@@ -397,7 +396,6 @@ function Populate-SoftwareTab {
         $sel = $global:allCheckboxes | Where-Object { $_.cb.Checked }
         if ($sel.Count -eq 0) { [System.Windows.Forms.MessageBox]::Show("Seleccione software.", "Info", 0, 48); return }
         
-        # Verificar instaladores
         $wg = Test-Winget; $ch = Test-Chocolatey
         if (-not $wg -and -not $ch) { 
             if (-not (Install-Winget)) { Install-Chocolatey }
