@@ -1,17 +1,3 @@
-
-
-Hola. He analizado tu código, las imágenes de los errores y la estructura de tu repositorio.
-
-Identifiqué 4 problemas principales que causan los fallos que mencionas:
-
-1.  **Error de Nombre del Repositorio:** Tu script intenta descargar de `shadowiex`, pero según la captura de pantalla (la barra de direcciones), tu repositorio real se llama **`shadowwixex`**. Por eso falla la descarga de instaladores.
-2.  **Nombre del Logo Incorrecto:** Tu código busca `SHADOWIEX_LOGO.png`, pero en tu repositorio el archivo se llama `SHADOWWIXEX_LOGO.png` (con doble W y X).
-3.  **Error de Referencia Nula (Scope Issue):** El error "No se puede llamar a un método en una expresión con valor NULL" ocurre porque al hacer clic en "Actualizar Lista" o "Instalar", el script pierde la referencia a la lista de instaladores (`$installersList`) debido a cómo PowerShell maneja las variables dentro de las funciones de los botones.
-4.  **Iconos (Emojis) que no se ven:** La fuente por defecto (`Segoe UI`) a veces no renderiza bien los emojis en PowerShell Forms. He cambiado la fuente a `Segoe UI Symbol` para que los iconos aparezcan correctamente.
-
-Aquí tienes el código completo **corregido y funcional**. He modificado lo necesario para que todo funcione:
-
-```powershell
 <#
 .SYNOPSIS
     Shadowiex - Herramienta de Configuración y Optimización del Sistema
@@ -19,16 +5,16 @@ Aquí tienes el código completo **corregido y funcional**. He modificado lo nec
     Una herramienta completa para instalar software, optimizar el sistema y gestionar activaciones de Windows y Office con interfaz profesional.
 .NOTES
     Autor: WalterShadow2001
-    Versión: 3.6 - Professional Edition (Corregido y Optimizado)
+    Versión: 3.7 - Professional Edition (Corregido: Nombres y Rutas)
     Requiere: PowerShell 5.1 o superior, privilegios de administrador
 #>
 
 # Configuración inicial
-$ErrorActionPreference = "Stop"
-$ProgressPreference = 'SilentlyContinue'
+ $ErrorActionPreference = "Stop"
+ $ProgressPreference = 'SilentlyContinue'
 
 # Variable global para controles de UI (Soluciona el error de Null Reference)
-$script:UIControls = @{}
+ $script:UIControls = @{}
 
 # Verificar si se ejecuta como administrador
 function Test-Administrator {
@@ -49,9 +35,9 @@ Add-Type -AssemblyName System.Management.Automation
 Add-Type -AssemblyName PresentationFramework
 
 # Variables globales
-$global:InstallProgress = @{}
-$global:TotalSoftware = 0
-$global:InstalledSoftware = 0
+ $global:InstallProgress = @{}
+ $global:TotalSoftware = 0
+ $global:InstalledSoftware = 0
 
 # Clase para manejar el estado de instalación
 class InstallationState {
@@ -69,39 +55,35 @@ class InstallationState {
 }
 
 # Crear formulario principal con tema profesional
-$form = New-Object System.Windows.Forms.Form
-$form.Text = "Shadowwixex - Professional Edition"
-$form.Size = New-Object System.Drawing.Size(900, 600)
-$form.StartPosition = "CenterScreen"
-$form.BackColor = [System.Drawing.Color]::FromArgb(25, 25, 35)
-$form.ForeColor = [System.Drawing.Color]::White
+ $form = New-Object System.Windows.Forms.Form
+ $form.Text = "Shadowiex - Professional Edition"
+ $form.Size = New-Object System.Drawing.Size(900, 600)
+ $form.StartPosition = "CenterScreen"
+ $form.BackColor = [System.Drawing.Color]::FromArgb(25, 25, 35)
+ $form.ForeColor = [System.Drawing.Color]::White
 
-# Añadir logo desde el repositorio (CORREGIDO: Busca ambos nombres de archivo por seguridad)
+# --- CORRECCIÓN DE ICONOS Y LOGOS ---
 try {
     $scriptRoot = if ($PSScriptRoot) { $PSScriptRoot } else { $PWD.Path }
     
-    # Intentamos buscar el logo con el nombre correcto según la imagen: SHADOWWIXEX_LOGO.png
-    $logoPaths = @(
-        (Join-Path -Path $scriptRoot -ChildPath "SHADOWWIXEX_LOGO.png"),
-        (Join-Path -Path $scriptRoot -ChildPath "SHADOWIEX_LOGO.png") # Fallback por si acaso
-    )
-    
-    $foundLogo = $false
-    foreach ($path in $logoPaths) {
-        if (Test-Path -Path $path) {
-            $logoImage = [System.Drawing.Image]::FromFile($path)
-            $pictureBox = New-Object System.Windows.Forms.PictureBox
-            $pictureBox.Image = $logoImage
-            $pictureBox.Size = New-Object System.Drawing.Size(32, 32)
-            $pictureBox.Location = New-Object System.Drawing.Point(10, 10)
-            $form.Controls.Add($pictureBox)
-            $foundLogo = $true
-            break
-        }
+    # 1. Cargar Icono de la ventana (.ico)
+    $iconPath = Join-Path -Path $scriptRoot -ChildPath "SHADOWIEX_LOGO.ico"
+    if (Test-Path -Path $iconPath) {
+        $form.Icon = [System.Drawing.Icon]::ExtractAssociatedIcon($iconPath)
     }
+
+    # 2. Cargar Logo en PictureBox (.png)
+    $logoPath = Join-Path -Path $scriptRoot -ChildPath "SHADOWIEX_LOGO.png"
     
-    if (-not $foundLogo) {
-        Write-Host "Logo no encontrado. Usando icono predeterminado."
+    if (Test-Path -Path $logoPath) {
+        $logoImage = [System.Drawing.Image]::FromFile($logoPath)
+        $pictureBox = New-Object System.Windows.Forms.PictureBox
+        $pictureBox.Image = $logoImage
+        $pictureBox.Size = New-Object System.Drawing.Size(32, 32)
+        $pictureBox.Location = New-Object System.Drawing.Point(10, 10)
+        $form.Controls.Add($pictureBox)
+    } else {
+        Write-Host "Logo SHADOWIEX_LOGO.png no encontrado. Usando icono predeterminado."
         $icon = [System.Drawing.SystemIcons]::Application
         $pictureBox = New-Object System.Windows.Forms.PictureBox
         $pictureBox.Image = $icon.ToBitmap()
@@ -111,55 +93,49 @@ try {
     }
 }
 catch {
-    Write-Host "Error al cargar logo: $($_.Exception.Message)"
-    $icon = [System.Drawing.SystemIcons]::Application
-    $pictureBox = New-Object System.Windows.Forms.PictureBox
-    $pictureBox.Image = $icon.ToBitmap()
-    $pictureBox.Size = New-Object System.Drawing.Size(32, 32)
-    $pictureBox.Location = New-Object System.Drawing.Point(10, 10)
-    $form.Controls.Add($pictureBox)
+    Write-Host "Error al cargar logo/icono: $($_.Exception.Message)"
 }
 
 # Añadir texto "CREADO POR WDPN"
-$createdByLabel = New-Object System.Windows.Forms.Label
-$createdByLabel.Text = "CREADO POR WDPN"
-$createdByLabel.Location = New-Object System.Drawing.Point(820, 560)
-$createdByLabel.Size = New-Object System.Drawing.Size(70, 20)
-$createdByLabel.ForeColor = [System.Drawing.Color]::FromArgb(150, 150, 150)
-$createdByLabel.Font = New-Object System.Drawing.Font("Segoe UI", 8)
-$form.Controls.Add($createdByLabel)
+ $createdByLabel = New-Object System.Windows.Forms.Label
+ $createdByLabel.Text = "CREADO POR WDPN"
+ $createdByLabel.Location = New-Object System.Drawing.Point(820, 560)
+ $createdByLabel.Size = New-Object System.Drawing.Size(70, 20)
+ $createdByLabel.ForeColor = [System.Drawing.Color]::FromArgb(150, 150, 150)
+ $createdByLabel.Font = New-Object System.Drawing.Font("Segoe UI", 8)
+ $form.Controls.Add($createdByLabel)
 
 # Crear control de pestañas
-$tabControl = New-Object System.Windows.Forms.TabControl
-$tabControl.Dock = [System.Windows.Forms.DockStyle]::Fill
-$tabControl.BackColor = [System.Drawing.Color]::FromArgb(35, 35, 45)
-$tabControl.Appearance = [System.Windows.Forms.TabAppearance]::Buttons
+ $tabControl = New-Object System.Windows.Forms.TabControl
+ $tabControl.Dock = [System.Windows.Forms.DockStyle]::Fill
+ $tabControl.BackColor = [System.Drawing.Color]::FromArgb(35, 35, 45)
+ $tabControl.Appearance = [System.Windows.Forms.TabAppearance]::Buttons
 
-$tabBasicSoftware = New-Object System.Windows.Forms.TabPage
-$tabBasicSoftware.Text = "Software Básico"
-$tabBasicSoftware.BackColor = [System.Drawing.Color]::FromArgb(35, 35, 45)
-$tabBasicSoftware.ForeColor = [System.Drawing.Color]::White
+ $tabBasicSoftware = New-Object System.Windows.Forms.TabPage
+ $tabBasicSoftware.Text = "Software Básico"
+ $tabBasicSoftware.BackColor = [System.Drawing.Color]::FromArgb(35, 35, 45)
+ $tabBasicSoftware.ForeColor = [System.Drawing.Color]::White
 
-$tabInstallers = New-Object System.Windows.Forms.TabPage
-$tabInstallers.Text = "Instaladores Personalizados"
-$tabInstallers.BackColor = [System.Drawing.Color]::FromArgb(35, 35, 45)
-$tabInstallers.ForeColor = [System.Drawing.Color]::White
+ $tabInstallers = New-Object System.Windows.Forms.TabPage
+ $tabInstallers.Text = "Instaladores Personalizados"
+ $tabInstallers.BackColor = [System.Drawing.Color]::FromArgb(35, 35, 45)
+ $tabInstallers.ForeColor = [System.Drawing.Color]::White
 
-$tabActivations = New-Object System.Windows.Forms.TabPage
-$tabActivations.Text = "Activaciones & Optimización"
-$tabActivations.BackColor = [System.Drawing.Color]::FromArgb(35, 35, 45)
-$tabActivations.ForeColor = [System.Drawing.Color]::White
+ $tabActivations = New-Object System.Windows.Forms.TabPage
+ $tabActivations.Text = "Activaciones & Optimización"
+ $tabActivations.BackColor = [System.Drawing.Color]::FromArgb(35, 35, 45)
+ $tabActivations.ForeColor = [System.Drawing.Color]::White
 
-$tabSettings = New-Object System.Windows.Forms.TabPage
-$tabSettings.Text = "Configuración"
-$tabSettings.BackColor = [System.Drawing.Color]::FromArgb(35, 35, 45)
-$tabSettings.ForeColor = [System.Drawing.Color]::White
+ $tabSettings = New-Object System.Windows.Forms.TabPage
+ $tabSettings.Text = "Configuración"
+ $tabSettings.BackColor = [System.Drawing.Color]::FromArgb(35, 35, 45)
+ $tabSettings.ForeColor = [System.Drawing.Color]::White
 
-$tabControl.Controls.Add($tabBasicSoftware)
-$tabControl.Controls.Add($tabInstallers)
-$tabControl.Controls.Add($tabActivations)
-$tabControl.Controls.Add($tabSettings)
-$form.Controls.Add($tabControl)
+ $tabControl.Controls.Add($tabBasicSoftware)
+ $tabControl.Controls.Add($tabInstallers)
+ $tabControl.Controls.Add($tabActivations)
+ $tabControl.Controls.Add($tabSettings)
+ $form.Controls.Add($tabControl)
 
 # Función para crear botones
 function Create-ProfessionalButton {
@@ -311,7 +287,6 @@ function Download-And-Install {
             $progressBar.Value = 100
             return $true
         } else {
-            # A veces el instalador devuelve códigos extraños pero funciona si es 0 o reboot required
             if ($process.ExitCode -eq 1641 -or $process.ExitCode -eq 3010) { return $true }
             return $false
         }
@@ -356,12 +331,11 @@ function Clean-TempFiles {
 function Activate-WindowsAndOffice {
     try {
         $scriptRoot = if ($PSScriptRoot) { $PSScriptRoot } else { $PWD.Path }
-        # CORREGIDO: Nombre del archivo según repo
         $tsforgeScript = Join-Path -Path $scriptRoot -ChildPath "TSforge_Activation.cmd"
         
         if (-not (Test-Path -Path $tsforgeScript)) {
-            # CORREGIDO: URL del repo shadowwixex
-            $tsforgeUrl = "https://github.com/WalterShadow2001/shadowwixex/raw/main/TSforge_Activation.cmd"
+            # CORREGIDO: URL del repo shadowiex
+            $tsforgeUrl = "https://github.com/WalterShadow2001/shadowiex/raw/main/TSforge_Activation.cmd"
             Invoke-WebRequest -Uri $tsforgeUrl -OutFile $tsforgeScript -ErrorAction Stop
         }
         
@@ -396,10 +370,10 @@ function Download-InstallersFromGitHub {
     try {
         if (-not (Test-Path -Path $destinationPath)) { New-Item -ItemType Directory -Path $destinationPath -Force | Out-Null }
         
-        # CORREGIDO: URL actualizada al nombre real del repositorio 'shadowwixex'
-        $repoUrl = "https://github.com/WalterShadow2001/shadowwixex/archive/refs/heads/main.zip"
-        $tempZip = Join-Path -Path $env:TEMP -ChildPath "shadowwixex-instaladores.zip"
-        $extractPath = Join-Path -Path $env:TEMP -ChildPath "shadowwixex-extract"
+        # CORREGIDO: URL actualizada al nombre real del repositorio 'shadowiex'
+        $repoUrl = "https://github.com/WalterShadow2001/shadowiex/archive/refs/heads/main.zip"
+        $tempZip = Join-Path -Path $env:TEMP -ChildPath "shadowiex-instaladores.zip"
+        $extractPath = Join-Path -Path $env:TEMP -ChildPath "shadowiex-extract"
         
         Invoke-WebRequest -Uri $repoUrl -OutFile $tempZip -ErrorAction Stop
         
@@ -407,7 +381,7 @@ function Download-InstallersFromGitHub {
         Expand-Archive -Path $tempZip -DestinationPath $extractPath -Force
         
         # CORREGIDO: Ruta dentro del zip extraído
-        $sourceDir = Join-Path -Path $extractPath -ChildPath "shadowwixex-main\instaladores"
+        $sourceDir = Join-Path -Path $extractPath -ChildPath "shadowiex-main\instaladores"
         if (Test-Path -Path $sourceDir) {
             $instaladores = Get-ChildItem -Path $sourceDir -Filter "*.exe" -ErrorAction SilentlyContinue
             foreach ($instalador in $instaladores) {
@@ -423,7 +397,7 @@ function Download-InstallersFromGitHub {
 }
 
 # Datos de Software
-$softwareCategories = @{
+ $softwareCategories = @{
     "Navegadores" = @(
         @{id = "Google.Chrome"; name = "Google Chrome"; icon = "🌐"},
         @{id = "Mozilla.Firefox"; name = "Mozilla Firefox"; icon = "🦊"},
@@ -498,7 +472,6 @@ function Populate-SoftwareTab {
             $checkbox.Tag = $software.id
             $checkbox.ForeColor = [System.Drawing.Color]::White
             $checkbox.BackColor = [System.Drawing.Color]::FromArgb(45, 45, 55)
-            # Asignar fuente corregida
             $checkbox.Font = $emojiFont
             $scrollPanel.Controls.Add($checkbox)
             $global:allCheckboxes += @{checkbox = $checkbox; id = $software.id; name = $software.name}
@@ -560,7 +533,7 @@ function Populate-InstallersTab {
     $titleLabel = Create-ProfessionalLabel -text "Gestor de Instaladores Personalizados" -x 15 -y 10 -font (New-Object System.Drawing.Font("Segoe UI", 10, [System.Drawing.FontStyle]::Bold))
     $tabInstallers.Controls.Add($titleLabel)
     
-    # Crear lista y guardarla en variable global de UI para evitar errores de Null Reference
+    # Crear lista y guardarla en variable global de UI
     $installersList = New-Object System.Windows.Forms.ListBox
     $installersList.Location = New-Object System.Drawing.Point(15, 40)
     $installersList.Size = New-Object System.Drawing.Size(860, 150)
@@ -568,11 +541,9 @@ function Populate-InstallersTab {
     $installersList.ForeColor = [System.Drawing.Color]::White
     $installersList.SelectionMode = [System.Windows.Forms.SelectionMode]::MultiExtended
     $tabInstallers.Controls.Add($installersList)
-    # GUARDAR REFERENCIA GLOBAL
     $script:UIControls['InstallersList'] = $installersList
     
     $refreshButton = Create-ProfessionalButton -text "Actualizar Lista" -x 15 -y 200 -width 120 -height 30 -action {
-        # RECUPERAR REFERENCIA GLOBAL
         $listBox = $script:UIControls['InstallersList']
         if ($null -eq $listBox) { return }
         
@@ -613,7 +584,6 @@ function Populate-InstallersTab {
     $tabInstallers.Controls.Add($selectFolderButton)
     
     $installButton = Create-ProfessionalButton -text "Instalar Seleccionados" -x 155 -y 240 -width 180 -height 35 -action {
-        # RECUPERAR REFERENCIA GLOBAL
         $listBox = $script:UIControls['InstallersList']
         if ($null -eq $listBox) { return }
         
@@ -658,7 +628,6 @@ function Populate-InstallersTab {
                 $installer = $installers | Where-Object { $_.Name -eq $installerName } | Select-Object -First 1
                 
                 if ($installer) {
-                    # Copiar e instalar desde la ruta local
                     Copy-Item -Path $installer.FullName -Destination $downloadPath -Force
                     Download-And-Install -url $installer.FullName -fileName $installer.Name -downloadPath $downloadPath -progressBar $progressBar -statusLabel $statusLabel
                 }
@@ -675,7 +644,6 @@ function Populate-InstallersTab {
         $folderBrowser.SelectedPath = [Environment]::GetFolderPath("Desktop")
         if ($folderBrowser.ShowDialog() -eq [System.Windows.Forms.DialogResult]::OK) {
             Download-InstallersFromGitHub -destinationPath $folderBrowser.SelectedPath
-            # Auto-actualizar lista después de descargar
             Start-Sleep -Seconds 1
             $listBox = $script:UIControls['InstallersList']
             if ($listBox) {
@@ -751,13 +719,13 @@ function Populate-SettingsTab {
     $installChocoButton = Create-ProfessionalButton -text "Instalar Chocolatey" -x 20 -y 160 -width 120 -height 30 -action { Install-Chocolatey; $chocoStatusLabel.Text = "Estado: Instalado" }
     $tabSettings.Controls.Add($installChocoButton)
     
-    $updateLabel = Create-ProfessionalLabel -text "Actualizar Shadowwixex:" -x 20 -y 240 -font (New-Object System.Drawing.Font("Segoe UI", 9, [System.Drawing.FontStyle]::Bold))
+    $updateLabel = Create-ProfessionalLabel -text "Actualizar Shadowiex:" -x 20 -y 240 -font (New-Object System.Drawing.Font("Segoe UI", 9, [System.Drawing.FontStyle]::Bold))
     $tabSettings.Controls.Add($updateLabel)
     $updateButton = Create-ProfessionalButton -text "Actualizar desde GitHub" -x 20 -y 260 -width 150 -height 30 -action {
         try {
-            # CORREGIDO: URL shadowwixex
-            $updateUrl = "https://github.com/WalterShadow2001/shadowwixex/raw/main/Shadowwixex.ps1"
-            $tempFile = "$env:TEMP\Shadowwixex.ps1"
+            # CORREGIDO: URL shadowiex
+            $updateUrl = "https://github.com/WalterShadow2001/shadowiex/raw/main/Shadowiex.ps1"
+            $tempFile = "$env:TEMP\Shadowiex.ps1"
             Invoke-WebRequest -Uri $updateUrl -OutFile $tempFile -ErrorAction Stop
             Copy-Item -Path $tempFile -Destination $PSCommandPath -Force
             [System.Windows.Forms.MessageBox]::Show("Script actualizado. Reinicie.", "Actualización", [System.Windows.Forms.MessageBoxButtons]::OK, [System.Windows.Forms.MessageBoxIcon]::Information)
@@ -773,6 +741,5 @@ Populate-InstallersTab
 Populate-ActivationsTab
 Populate-SettingsTab
 
-$form.Add_Shown({$form.Activate()})
+ $form.Add_Shown({$form.Activate()})
 [void]$form.ShowDialog()
-```
