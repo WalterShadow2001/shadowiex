@@ -60,18 +60,37 @@ function Find-MAS {
     if ($Global:MAS_File -and (Test-Path $Global:MAS_File)) { return $Global:MAS_File }
     
     # Buscar MAS_AIO.cmd en varias ubicaciones
-    $searchPaths = @(
-        # Mismo directorio del script
-        Join-Path (Split-Path -Parent $MyInvocation.MyCommand.Path) "MAS_AIO.cmd"
-        # Directorio actual
-        ".\MAS_AIO.cmd"
-        # Desktop
-        Join-Path [Environment]::GetFolderPath("Desktop") "MAS_AIO.cmd"
-        # TEMP (si ya se extrajo antes)
-        Join-Path $env:TEMP "SHADOWIEX_MAS.cmd"
-        # Descargas
-        Join-Path ([Environment]::GetFolderPath("UserProfile")) "Downloads\MAS_AIO.cmd"
-    )
+    $searchPaths = @()
+    
+    # Mismo directorio del script (solo si hay path)
+    try {
+        $scriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
+        if ($scriptDir) {
+            $searchPaths += Join-Path $scriptDir "MAS_AIO.cmd"
+        }
+    } catch {}
+    
+    # Directorio actual
+    $searchPaths += ".\MAS_AIO.cmd"
+    
+    # Desktop
+    try {
+        $desktopPath = [Environment]::GetFolderPath("Desktop")
+        if ($desktopPath) {
+            $searchPaths += Join-Path $desktopPath "MAS_AIO.cmd"
+        }
+    } catch {}
+    
+    # TEMP (si ya se extrajo antes)
+    $searchPaths += Join-Path $env:TEMP "SHADOWIEX_MAS.cmd"
+    
+    # Descargas
+    try {
+        $downloadsPath = Join-Path $env:USERPROFILE "Downloads"
+        if ($downloadsPath) {
+            $searchPaths += Join-Path $downloadsPath "MAS_AIO.cmd"
+        }
+    } catch {}
     
     foreach ($path in $searchPaths) {
         if ($path -and (Test-Path $path)) {
@@ -86,7 +105,7 @@ function Find-MAS {
 function Deploy-MAS {
     $masPath = Find-MAS
     if ($masPath) { 
-        Update-Status "MAS encontrado: $masPath" "success"
+        Update-Status "MAS encontrado" "success"
         return $masPath 
     }
     
