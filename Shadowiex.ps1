@@ -1,1308 +1,1060 @@
 <#
 .SYNOPSIS
-    Shadowiex - Professional Edition v7.0
+    Shadowiex - WinUtil Style Edition v8.0
 .DESCRIPTION
-    Versión mejorada con barras de progreso, mejor manejo de errores
-    e integración con Microsoft Activation Scripts (MAS).
+    Interfaz moderna estilo Chris Titus WinUtil con mejoras en instalación y activación.
 .NOTES
-    Autor: WalterShadow2001
-    Versión: 7.0 - Professional Enhanced
+    Autor: WDPN (WalterShadow2001)
+    Versión: 8.0 - WinUtil Style
 #>
 
 # --- CONFIGURACIÓN INICIAL ---
- $ErrorActionPreference = "Continue"
- $ProgressPreference = 'SilentlyContinue'
- $script:UIControls = @{}
- $script:InstallationCancelled = $false
+$ErrorActionPreference = "Continue"
+$ProgressPreference = 'SilentlyContinue'
+$script:UIControls = @{}
+$script:AllChecked = $false
 
-# Funciones de Verificación (Definidas PRIMERO)
+# Funciones de Verificación
 function Test-Winget { 
     try { 
-        $proc = Start-Process "winget" -ArgumentList "--version" -NoNewWindow -PassThru -Wait -ErrorAction SilentlyContinue
-        return ($proc.ExitCode -eq 0)
+        $wingetPath = Get-Command winget -ErrorAction SilentlyContinue
+        if ($wingetPath) { return $true }
+        return $false
     } 
     catch { return $false } 
 }
 
 function Test-Chocolatey { 
     try { 
-        $proc = Start-Process "choco" -ArgumentList "--version" -NoNewWindow -PassThru -Wait -ErrorAction SilentlyContinue
-        return ($proc.ExitCode -eq 0)
+        $chocoPath = Get-Command choco -ErrorAction SilentlyContinue
+        if ($chocoPath) { return $true }
+        return $false
     } 
     catch { return $false } 
 }
 
-# Colores del tema
- $colors = @{
-    Background  = [System.Drawing.Color]::FromArgb(25, 25, 35)
-    Panel       = [System.Drawing.Color]::FromArgb(40, 40, 55)
-    PanelLight  = [System.Drawing.Color]::FromArgb(55, 55, 75)
-    Accent      = [System.Drawing.Color]::FromArgb(0, 122, 204)
-    AccentHover = [System.Drawing.Color]::FromArgb(0, 95, 170)
-    Text        = [System.Drawing.Color]::White
-    TextSub     = [System.Drawing.Color]::FromArgb(180, 180, 190)
-    Success     = [System.Drawing.Color]::FromArgb(46, 204, 113)
-    Warning     = [System.Drawing.Color]::FromArgb(241, 196, 15)
-    Danger      = [System.Drawing.Color]::FromArgb(231, 76, 60)
-    Info        = [System.Drawing.Color]::FromArgb(52, 152, 219)
-    Progress    = [System.Drawing.Color]::FromArgb(0, 200, 150)
-}
-
-# Estilos de Fuente
- $styleBold = [System.Drawing.FontStyle]::Bold
- $styleRegular = [System.Drawing.FontStyle]::Regular
- $styleItalic = [System.Drawing.FontStyle]::Italic
-
-# Verificación de Administrador
-function Test-Administrator {
-    $currentUser = [Security.Principal.WindowsIdentity]::GetCurrent()
-    $principal = New-Object Security.Principal.WindowsPrincipal($currentUser)
+function Test-Admin {
+    $user = [Security.Principal.WindowsIdentity]::GetCurrent()
+    $principal = New-Object Security.Principal.WindowsPrincipal($user)
     return $principal.IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)
 }
 
-if (-not (Test-Administrator)) {
+if (-not (Test-Admin)) {
     Start-Process powershell.exe "-NoProfile -ExecutionPolicy Bypass -File `"$PSCommandPath`"" -Verb RunAs
     Exit
 }
 
 Add-Type -AssemblyName System.Windows.Forms
 Add-Type -AssemblyName System.Drawing
-Add-Type -AssemblyName System.Management.Automation
+
+# --- COLORES ESTILO WINUTIL ---
+$theme = @{
+    Background     = [System.Drawing.Color]::FromArgb(30, 30, 30)
+    PanelDark      = [System.Drawing.Color]::FromArgb(45, 45, 45)
+    PanelLight     = [System.Drawing.Color]::FromArgb(55, 55, 55)
+    Border         = [System.Drawing.Color]::FromArgb(70, 70, 70)
+    Accent         = [System.Drawing.Color]::FromArgb(0, 150, 136)
+    AccentHover    = [System.Drawing.Color]::FromArgb(0, 121, 107)
+    ButtonPrimary  = [System.Drawing.Color]::FromArgb(33, 150, 243)
+    ButtonSuccess  = [System.Drawing.Color]::FromArgb(76, 175, 80)
+    ButtonDanger   = [System.Drawing.Color]::FromArgb(244, 67, 54)
+    ButtonWarning  = [System.Drawing.Color]::FromArgb(255, 152, 0)
+    ButtonInfo     = [System.Drawing.Color]::FromArgb(0, 188, 212)
+    TextPrimary    = [System.Drawing.Color]::White
+    TextSecondary  = [System.Drawing.Color]::FromArgb(170, 170, 170)
+    TextMuted      = [System.Drawing.Color]::FromArgb(120, 120, 120)
+    Category       = [System.Drawing.Color]::FromArgb(100, 181, 246)
+    Success        = [System.Drawing.Color]::FromArgb(129, 199, 132)
+    Error          = [System.Drawing.Color]::FromArgb(239, 154, 154)
+}
+
+# Fuentes
+$fontTitle = New-Object System.Drawing.Font("Segoe UI", 20, [System.Drawing.FontStyle]::Bold)
+$fontHeader = New-Object System.Drawing.Font("Segoe UI", 12, [System.Drawing.FontStyle]::Bold)
+$fontSubHeader = New-Object System.Drawing.Font("Segoe UI", 11, [System.Drawing.FontStyle]::Bold)
+$fontNormal = New-Object System.Drawing.Font("Segoe UI", 10)
+$fontSmall = New-Object System.Drawing.Font("Segoe UI", 9)
+$fontButton = New-Object System.Drawing.Font("Segoe UI", 10, [System.Drawing.FontStyle]::Bold)
 
 # --- FORMULARIO PRINCIPAL ---
- $form = New-Object System.Windows.Forms.Form
- $form.Text = "Shadowiex Professional v7.0"
- $form.Size = New-Object System.Drawing.Size(1000, 720)
- $form.StartPosition = "CenterScreen"
- $form.BackColor = $colors.Background
- $form.ForeColor = $colors.Text
- $form.MinimumSize = New-Object System.Drawing.Size(900, 650)
- $form.FormBorderStyle = [System.Windows.Forms.FormBorderStyle]::Sizable
+$form = New-Object System.Windows.Forms.Form
+$form.Text = "Shadowiex - WinUtil Style"
+$form.Size = New-Object System.Drawing.Size(1100, 750)
+$form.StartPosition = "CenterScreen"
+$form.BackColor = $theme.Background
+$form.ForeColor = $theme.TextPrimary
+$form.MinimumSize = New-Object System.Drawing.Size(1000, 700)
+$form.FormBorderStyle = [System.Windows.Forms.FormBorderStyle]::Sizable
 
-# --- LOGO E ICONO ---
-try {
-    $scriptRoot = if ($PSScriptRoot) { $PSScriptRoot } else { $PWD.Path }
-    $iconPath = Join-Path -Path $scriptRoot -ChildPath "SHADOWIEX_LOGO.ico"
-    if (Test-Path -Path $iconPath) { $form.Icon = [System.Drawing.Icon]::ExtractAssociatedIcon($iconPath) }
+# Panel superior con título
+$headerPanel = New-Object System.Windows.Forms.Panel
+$headerPanel.Dock = [System.Windows.Forms.DockStyle]::Top
+$headerPanel.Height = 80
+$headerPanel.BackColor = $theme.PanelDark
+$form.Controls.Add($headerPanel)
 
-    $logoPath = Join-Path -Path $scriptRoot -ChildPath "SHADOWIEX_LOGO.png"
-    if (Test-Path -Path $logoPath) {
-        $logoImage = [System.Drawing.Image]::FromFile($logoPath)
-        $pictureBox = New-Object System.Windows.Forms.PictureBox
-        $pictureBox.Image = $logoImage
-        $pictureBox.SizeMode = [System.Windows.Forms.PictureBoxSizeMode]::Zoom
-        $pictureBox.Size = New-Object System.Drawing.Size(55, 55)
-        $pictureBox.Location = New-Object System.Drawing.Point(20, 12)
-        $pictureBox.BackColor = [System.Drawing.Color]::Transparent
-        $form.Controls.Add($pictureBox)
-        
-        $titleLabel = New-Object System.Windows.Forms.Label
-        $titleLabel.Text = "Shadowiex Professional"
-        $titleLabel.Location = New-Object System.Drawing.Point(85, 22)
-        $titleLabel.Size = New-Object System.Drawing.Size(350, 35)
-        $titleLabel.Font = New-Object System.Drawing.Font("Segoe UI", 18, $styleBold)
-        $titleLabel.ForeColor = $colors.Text
-        $form.Controls.Add($titleLabel)
+$titleLabel = New-Object System.Windows.Forms.Label
+$titleLabel.Text = "SHADOWIEX"
+$titleLabel.Location = New-Object System.Drawing.Point(20, 15)
+$titleLabel.Size = New-Object System.Drawing.Size(300, 40)
+$titleLabel.Font = $fontTitle
+$titleLabel.ForeColor = $theme.Accent
+$headerPanel.Controls.Add($titleLabel)
+
+$subtitleLabel = New-Object System.Windows.Forms.Label
+$subtitleLabel.Text = "Professional Installation & Activation Tool"
+$subtitleLabel.Location = New-Object System.Drawing.Point(20, 50)
+$subtitleLabel.Size = New-Object System.Drawing.Size(400, 25)
+$subtitleLabel.Font = $fontSmall
+$subtitleLabel.ForeColor = $theme.TextSecondary
+$headerPanel.Controls.Add($subtitleLabel)
+
+$versionLabel = New-Object System.Windows.Forms.Label
+$versionLabel.Text = "v8.0"
+$versionLabel.Location = New-Object System.Drawing.Point(280, 15)
+$versionLabel.Size = New-Object System.Drawing.Size(60, 25)
+$versionLabel.Font = $fontSmall
+$versionLabel.ForeColor = $theme.TextMuted
+$headerPanel.Controls.Add($versionLabel)
+
+# Barra de estado inferior
+$statusPanel = New-Object System.Windows.Forms.Panel
+$statusPanel.Dock = [System.Windows.Forms.DockStyle]::Bottom
+$statusPanel.Height = 35
+$statusPanel.BackColor = $theme.PanelDark
+$form.Controls.Add($statusPanel)
+
+$script:statusLabel = New-Object System.Windows.Forms.Label
+$script:statusLabel.Text = "Listo"
+$script:statusLabel.Location = New-Object System.Drawing.Point(15, 8)
+$script:statusLabel.Size = New-Object System.Drawing.Size(800, 20)
+$script:statusLabel.Font = $fontSmall
+$script:statusLabel.ForeColor = $theme.TextSecondary
+$statusPanel.Controls.Add($script:statusLabel)
+
+$footerLabel = New-Object System.Windows.Forms.Label
+$footerLabel.Text = "WDPN | github.com/WalterShadow2001"
+$footerLabel.Location = New-Object System.Drawing.Point(850, 8)
+$footerLabel.Size = New-Object System.Drawing.Size(220, 20)
+$footerLabel.Font = $fontSmall
+$footerLabel.ForeColor = $theme.TextMuted
+$footerLabel.TextAlign = [System.Drawing.ContentAlignment]::TopRight
+$statusPanel.Controls.Add($footerLabel)
+
+# --- PANEL DE NAVEGACIÓN IZQUIERDO ---
+$navPanel = New-Object System.Windows.Forms.Panel
+$navPanel.Location = New-Object System.Drawing.Point(0, 80)
+$navPanel.Size = New-Object System.Drawing.Size(200, 635)
+$navPanel.BackColor = $theme.PanelDark
+$form.Controls.Add($navPanel)
+
+$navButtons = @()
+$navItems = @("Instalar", "Tweaks", "Activar", "Config")
+
+$navY = 20
+foreach ($item in $navItems) {
+    $navBtn = New-Object System.Windows.Forms.Button
+    $navBtn.Text = $item
+    $navBtn.Location = New-Object System.Drawing.Point(10, $navY)
+    $navBtn.Size = New-Object System.Drawing.Size(180, 45)
+    $navBtn.BackColor = $theme.PanelLight
+    $navBtn.ForeColor = $theme.TextPrimary
+    $navBtn.FlatStyle = [System.Windows.Forms.FlatStyle]::Flat
+    $navBtn.Font = $fontButton
+    $navBtn.Cursor = [System.Windows.Forms.Cursors]::Hand
+    $navBtn.FlatAppearance.BorderSize = 0
+    $navBtn.Tag = $item
+    
+    $navBtn.Add_MouseEnter({
+        $this.BackColor = $theme.Accent
+    })
+    $navBtn.Add_MouseLeave({
+        if ($this.Tag -ne $script:activeNav) {
+            $this.BackColor = $theme.PanelLight
+        }
+    })
+    
+    $navPanel.Controls.Add($navBtn)
+    $navButtons += $navBtn
+    $navY += 55
+}
+
+# --- CONTENEDOR PRINCIPAL ---
+$mainContainer = New-Object System.Windows.Forms.Panel
+$mainContainer.Location = New-Object System.Drawing.Point(200, 80)
+$mainContainer.Size = New-Object System.Drawing.Size(900, 635)
+$mainContainer.BackColor = $theme.Background
+$form.Controls.Add($mainContainer)
+
+# --- FUNCIONES AUXILIARES ---
+
+function Update-Status {
+    param ([string]$text, [string]$type = "info")
+    $color = switch ($type) {
+        "success" { $theme.Success }
+        "error" { $theme.Error }
+        "warning" { $theme.ButtonWarning }
+        default { $theme.TextSecondary }
     }
-} catch {}
+    $script:statusLabel.Text = $text
+    $script:statusLabel.ForeColor = $color
+    [System.Windows.Forms.Application]::DoEvents()
+}
 
-# Barra de estado superior
- $statusPanel = New-Object System.Windows.Forms.Panel
- $statusPanel.Location = New-Object System.Drawing.Point(0, 70)
- $statusPanel.Size = New-Object System.Drawing.Size(1000, 35)
- $statusPanel.BackColor = $colors.Panel
- $statusPanel.Dock = [System.Windows.Forms.DockStyle]::None
- $form.Controls.Add($statusPanel)
+function New-CategoryPanel {
+    param ([string]$title, [int]$y)
+    
+    $panel = New-Object System.Windows.Forms.Panel
+    $panel.Location = New-Object System.Drawing.Point(15, $y)
+    $panel.Size = New-Object System.Drawing.Size(860, 30)
+    $panel.BackColor = $theme.PanelLight
+    
+    $label = New-Object System.Windows.Forms.Label
+    $label.Text = $title.ToUpper()
+    $label.Location = New-Object System.Drawing.Point(10, 5)
+    $label.Size = New-Object System.Drawing.Size(300, 20)
+    $label.Font = $fontSubHeader
+    $label.ForeColor = $theme.Category
+    $panel.Controls.Add($label)
+    
+    return $panel
+}
 
- $globalStatusLabel = New-Object System.Windows.Forms.Label
- $globalStatusLabel.Text = "Listo"
- $globalStatusLabel.Location = New-Object System.Drawing.Point(20, 8)
- $globalStatusLabel.Size = New-Object System.Drawing.Size(960, 20)
- $globalStatusLabel.Font = New-Object System.Drawing.Font("Segoe UI", 9.5, $styleRegular)
- $globalStatusLabel.ForeColor = $colors.TextSub
- $statusPanel.Controls.Add($globalStatusLabel)
+function New-AppCheckbox {
+    param ([string]$text, [int]$x, [int]$y, [int]$width = 280, [int]$height = 32)
+    
+    $checkbox = New-Object System.Windows.Forms.CheckBox
+    $checkbox.Text = $text
+    $checkbox.Location = New-Object System.Drawing.Point($x, $y)
+    $checkbox.Size = New-Object System.Drawing.Size($width, $height)
+    $checkbox.Font = $fontNormal
+    $checkbox.ForeColor = $theme.TextPrimary
+    $checkbox.BackColor = $theme.Background
+    $checkbox.FlatStyle = [System.Windows.Forms.FlatStyle]::Flat
+    $checkbox.FlatAppearance.BorderColor = $theme.Border
+    $checkbox.FlatAppearance.CheckedBackColor = $theme.Accent
+    
+    return $checkbox
+}
 
-# Footer
- $footerLabel = New-Object System.Windows.Forms.Label
- $footerLabel.Text = "CREADO POR WDPN | v7.0 Professional"
- $footerLabel.Location = New-Object System.Drawing.Point(20, 655)
- $footerLabel.Size = New-Object System.Drawing.Size(300, 25)
- $footerLabel.ForeColor = $colors.TextSub
- $footerLabel.Font = New-Object System.Drawing.Font("Segoe UI", 9, $styleItalic)
- $form.Controls.Add($footerLabel)
-
-# --- PESTAÑAS ---
- $tabControl = New-Object System.Windows.Forms.TabControl
- $tabControl.Location = New-Object System.Drawing.Point(0, 105)
- $tabControl.Size = New-Object System.Drawing.Size(984, 545)
- $tabControl.BackColor = $colors.Background
- $tabControl.Appearance = [System.Windows.Forms.TabAppearance]::Buttons
- $tabControl.ItemSize = New-Object System.Drawing.Size(140, 38)
- $tabControl.Font = New-Object System.Drawing.Font("Segoe UI", 10, $styleBold)
- $tabControl.Padding = New-Object System.Drawing.Point(12, 4)
-
- $tabBasicSoftware = New-Object System.Windows.Forms.TabPage
- $tabBasicSoftware.Text = "Software Básico"
- $tabBasicSoftware.BackColor = $colors.Background
- $tabBasicSoftware.Padding = New-Object System.Windows.Forms.Padding(10)
-
- $tabInstallers = New-Object System.Windows.Forms.TabPage
- $tabInstallers.Text = "Instaladores"
- $tabInstallers.BackColor = $colors.Background
- $tabInstallers.Padding = New-Object System.Windows.Forms.Padding(10)
-
- $tabActivations = New-Object System.Windows.Forms.TabPage
- $tabActivations.Text = "Activaciones"
- $tabActivations.BackColor = $colors.Background
- $tabActivations.Padding = New-Object System.Windows.Forms.Padding(10)
-
- $tabSettings = New-Object System.Windows.Forms.TabPage
- $tabSettings.Text = "Configuración"
- $tabSettings.BackColor = $colors.Background
- $tabSettings.Padding = New-Object System.Windows.Forms.Padding(10)
-
- $tabControl.Controls.Add($tabBasicSoftware)
- $tabControl.Controls.Add($tabInstallers)
- $tabControl.Controls.Add($tabActivations)
- $tabControl.Controls.Add($tabSettings)
- $form.Controls.Add($tabControl)
-
-# --- FUNCIONES UI HELPER MEJORADAS ---
-
-function Create-ModernButton {
+function New-ActionButton {
     param (
-        [string]$text,
-        [int]$x,
-        [int]$y,
-        [int]$width = 190,
-        [int]$height = 42,
-        [scriptblock]$action,
-        [object]$backColor = $null
+        [string]$text, 
+        [int]$x, 
+        [int]$y, 
+        [int]$width = 180, 
+        [int]$height = 40,
+        [string]$style = "primary"
     )
     
-    if ($null -eq $backColor) { $btnColor = $colors.Accent } else { $btnColor = $backColor }
-    
-    $button = New-Object System.Windows.Forms.Button
-    $button.Location = New-Object System.Drawing.Point($x, $y)
-    $button.Size = New-Object System.Drawing.Size($width, $height)
-    $button.Text = $text
-    $button.BackColor = $btnColor
-    $button.ForeColor = [System.Drawing.Color]::White
-    $button.FlatStyle = [System.Windows.Forms.FlatStyle]::Flat
-    $button.Font = New-Object System.Drawing.Font("Segoe UI", 9.5, $styleBold)
-    $button.Cursor = [System.Windows.Forms.Cursors]::Hand
-    $button.FlatAppearance.BorderSize = 0
-    $button.Margin = New-Object System.Windows.Forms.Padding(3)
-    
-    if ($null -eq $backColor) {
-        $button.FlatAppearance.MouseOverBackColor = $colors.AccentHover
-    } else {
-        $r = [Math]::Max(0, $backColor.R - 25)
-        $g = [Math]::Max(0, $backColor.G - 25)
-        $b = [Math]::Max(0, $backColor.B - 25)
-        $button.FlatAppearance.MouseOverBackColor = [System.Drawing.Color]::FromArgb($r, $g, $b)
+    $color = switch ($style) {
+        "success" { $theme.ButtonSuccess }
+        "danger" { $theme.ButtonDanger }
+        "warning" { $theme.ButtonWarning }
+        "info" { $theme.ButtonInfo }
+        default { $theme.ButtonPrimary }
     }
     
-    if ($action) { $button.Add_Click($action) }
+    $button = New-Object System.Windows.Forms.Button
+    $button.Text = $text
+    $button.Location = New-Object System.Drawing.Point($x, $y)
+    $button.Size = New-Object System.Drawing.Size($width, $height)
+    $button.BackColor = $color
+    $button.ForeColor = [System.Drawing.Color]::White
+    $button.FlatStyle = [System.Windows.Forms.FlatStyle]::Flat
+    $button.Font = $fontButton
+    $button.Cursor = [System.Windows.Forms.Cursors]::Hand
+    $button.FlatAppearance.BorderSize = 0
+    
+    $button.Add_MouseEnter({
+        $r = [Math]::Max(0, $this.BackColor.R - 20)
+        $g = [Math]::Max(0, $this.BackColor.G - 20)
+        $b = [Math]::Max(0, $this.BackColor.B - 20)
+        $this.BackColor = [System.Drawing.Color]::FromArgb($r, $g, $b)
+    })
+    $button.Add_MouseLeave({
+        $this.BackColor = $color
+    })
+    
     return $button
 }
 
-function Create-ModernLabel {
-    param (
-        [string]$text,
-        [int]$x,
-        [int]$y,
-        [int]$width = 300,
-        [bool]$isTitle = $false,
-        [object]$foreColor = $null
-    )
-    
-    $labelHeight = 22
-    if ($isTitle) { $labelHeight = 32 }
-    
-    $label = New-Object System.Windows.Forms.Label
-    $label.Text = $text
-    $label.Location = New-Object System.Drawing.Point($x, $y)
-    $label.Size = New-Object System.Drawing.Size($width, $labelHeight)
-    $label.ForeColor = if ($foreColor) { $foreColor } else { $colors.Text }
-    
-    if ($isTitle) {
-        $label.Font = New-Object System.Drawing.Font("Segoe UI", 12.5, $styleBold)
-    } else {
-        $label.Font = New-Object System.Drawing.Font("Segoe UI", 9.5, $styleRegular)
-    }
-    return $label
-}
-
-function Create-ProgressBar {
-    param (
-        [int]$x,
-        [int]$y,
-        [int]$width = 350,
-        [int]$height = 25
-    )
-    
-    $progress = New-Object System.Windows.Forms.ProgressBar
-    $progress.Location = New-Object System.Drawing.Point($x, $y)
-    $progress.Size = New-Object System.Drawing.Size($width, $height)
-    $progress.Style = [System.Windows.Forms.ProgressBarStyle]::Continuous
-    $progress.Minimum = 0
-    $progress.Maximum = 100
-    $progress.Value = 0
-    
-    return $progress
-}
-
-function Update-GlobalStatus {
-    param ([string]$message, [object]$color = $null)
-    if ($globalStatusLabel.InvokeRequired) {
-        $globalStatusLabel.Invoke([Action]{ param($m, $c) $globalStatusLabel.Text = $m; if ($c) { $globalStatusLabel.ForeColor = $c } } ,$message, $color)
-    } else {
-        $globalStatusLabel.Text = $message
-        if ($color) { $globalStatusLabel.ForeColor = $color }
-    }
-}
-
-# --- FORMULARIO DE PROGRESO MEJORADO ---
-function Show-ProgressDialog {
-    param (
-        [string]$title = "Procesando...",
-        [int]$totalSteps = 1
-    )
+function Show-Progress {
+    param ([string]$title, [int]$max = 100)
     
     $progForm = New-Object System.Windows.Forms.Form
     $progForm.Text = $title
-    $progForm.Size = New-Object System.Drawing.Size(520, 200)
-    $progForm.BackColor = $colors.Background
+    $progForm.Size = New-Object System.Drawing.Size(500, 180)
+    $progForm.BackColor = $theme.Background
     $progForm.StartPosition = "CenterParent"
     $progForm.FormBorderStyle = [System.Windows.Forms.FormBorderStyle]::FixedDialog
     $progForm.ControlBox = $false
     $progForm.TopMost = $true
     
-    # Label de título
-    $lblTitle = Create-ModernLabel -text $title -x 20 -y 15 -width 460 -isTitle $true
-    $progForm.Controls.Add($lblTitle)
+    $titleLabel = New-Object System.Windows.Forms.Label
+    $titleLabel.Text = $title
+    $titleLabel.Location = New-Object System.Drawing.Point(20, 15)
+    $titleLabel.Size = New-Object System.Drawing.Size(440, 25)
+    $titleLabel.Font = $fontHeader
+    $titleLabel.ForeColor = $theme.TextPrimary
+    $progForm.Controls.Add($titleLabel)
     
-    # Label de estado actual
-    $lblStatus = Create-ModernLabel -text "Iniciando..." -x 20 -y 55 -width 460
-    $lblStatus.ForeColor = $colors.TextSub
-    $progForm.Controls.Add($lblStatus)
+    $statusLabel = New-Object System.Windows.Forms.Label
+    $statusLabel.Text = "Iniciando..."
+    $statusLabel.Location = New-Object System.Drawing.Point(20, 50)
+    $statusLabel.Size = New-Object System.Drawing.Size(440, 20)
+    $statusLabel.Font = $fontNormal
+    $statusLabel.ForeColor = $theme.TextSecondary
+    $progForm.Controls.Add($statusLabel)
     
-    # Barra de progreso principal
-    $progressBar = Create-ProgressBar -x 20 -y 85 -width 460 -height 28
+    $progressBar = New-Object System.Windows.Forms.ProgressBar
+    $progressBar.Location = New-Object System.Drawing.Point(20, 80)
+    $progressBar.Size = New-Object System.Drawing.Size(440, 30)
+    $progressBar.Style = [System.Windows.Forms.ProgressBarStyle]::Continuous
+    $progressBar.Minimum = 0
+    $progressBar.Maximum = $max
     $progForm.Controls.Add($progressBar)
     
-    # Label de porcentaje
-    $lblPercent = Create-ModernLabel -text "0%" -x 20 -y 120 -width 100
-    $lblPercent.Font = New-Object System.Drawing.Font("Segoe UI", 10, $styleBold)
-    $lblPercent.ForeColor = $colors.Success
-    $progForm.Controls.Add($lblPercent)
-    
-    # Label de paso actual
-    $lblStep = Create-ModernLabel -text "Paso 0 de $totalSteps" -x 380 -y 120 -width 100
-    $lblStep.ForeColor = $colors.TextSub
-    $progForm.Controls.Add($lblStep)
-    
-    # Botón cancelar
-    $btnCancel = Create-ModernButton -text "Cancelar" -x 380 -y 150 -width 100 -height 30 -backColor $colors.Danger -action {
-        $script:InstallationCancelled = $true
+    $cancelBtn = New-ActionButton -text "Cancelar" -x 380 -y 120 -width 80 -height 28 -style "danger"
+    $cancelBtn.Add_Click({
+        $script:cancelled = $true
         $progForm.Close()
-    }
-    $progForm.Controls.Add($btnCancel)
+    })
+    $progForm.Controls.Add($cancelBtn)
     
     return @{
         Form = $progForm
-        ProgressBar = $progressBar
-        LabelStatus = $lblStatus
-        LabelPercent = $lblPercent
-        LabelStep = $lblStep
-        LabelTitle = $lblTitle
-        TotalSteps = $totalSteps
-        CurrentStep = 0
+        Progress = $progressBar
+        Status = $statusLabel
+        Max = $max
     }
 }
 
-function Update-ProgressDialog {
-    param (
-        $dialog,
-        [string]$status,
-        [int]$step = 0,
-        [int]$percent = -1
-    )
-    
+function Update-Progress {
+    param ($dialog, [string]$status, [int]$value)
     if ($dialog.Form.IsDisposed) { return }
-    
-    if ($status) {
-        $dialog.LabelStatus.Text = $status
-    }
-    
-    if ($step -gt 0) {
-        $dialog.CurrentStep = $step
-        $dialog.LabelStep.Text = "Paso $step de $($dialog.TotalSteps)"
-    }
-    
-    if ($percent -ge 0) {
-        $dialog.ProgressBar.Value = [Math]::Min(100, $percent)
-        $dialog.LabelPercent.Text = "$percent%"
-    }
-    
+    $dialog.Status.Text = $status
+    $dialog.Progress.Value = [Math]::Min($value, $dialog.Max)
     $dialog.Form.Refresh()
     [System.Windows.Forms.Application]::DoEvents()
 }
 
-# --- LÓGICA DE INSTALACIÓN MEJORADA ---
+# --- PANEL DE INSTALACIÓN ---
+$script:installPanel = New-Object System.Windows.Forms.Panel
+$script:installPanel.Location = New-Object System.Drawing.Point(0, 0)
+$script:installPanel.Size = New-Object System.Drawing.Size(900, 635)
+$script:installPanel.BackColor = $theme.Background
+$script:installPanel.Visible = $false
+$mainContainer.Controls.Add($script:installPanel)
 
-function Install-Winget {
-    param ($progressDialog)
-    
-    Update-ProgressDialog -dialog $progressDialog -status "Descargando Winget..." -percent 10
-    
-    try {
-        $uri = "https://github.com/microsoft/winget-cli/releases/latest/download/Microsoft.DesktopAppInstaller_8wekyb3d8bbwe.msixbundle"
-        $out = "$env:TEMP\Winget.msixbundle"
-        
-        # Descargar con timeout
-        $webClient = New-Object System.Net.WebClient
-        $downloadTask = $webClient.DownloadFileTaskAsync($uri, $out)
-        
-        # Esperar con timeout de 60 segundos
-        $timeout = 60
-        $start = Get-Date
-        while (-not $downloadTask.IsCompleted -and ((Get-Date) - $start).TotalSeconds -lt $timeout) {
-            [System.Windows.Forms.Application]::DoEvents()
-            Start-Sleep -Milliseconds 100
-        }
-        
-        if (-not $downloadTask.IsCompleted) {
-            $webClient.CancelAsync()
-            return $false
-        }
-        
-        Update-ProgressDialog -dialog $progressDialog -status "Instalando Winget..." -percent 50
-        
-        Add-AppxPackage -Path $out -ErrorAction Stop
-        Update-ProgressDialog -dialog $progressDialog -status "Winget instalado correctamente" -percent 100
-        
-        Start-Sleep -Milliseconds 500
-        return $true
-    } catch { 
-        Update-ProgressDialog -dialog $progressDialog -status "Error instalando Winget: $($_.Exception.Message)"
-        Start-Sleep -Seconds 2
-        return $false 
-    }
-}
+# Scroll panel para software
+$softwareScroll = New-Object System.Windows.Forms.Panel
+$softwareScroll.Location = New-Object System.Drawing.Point(0, 0)
+$softwareScroll.Size = New-Object System.Drawing.Size(880, 520)
+$softwareScroll.BackColor = $theme.Background
+$softwareScroll.AutoScroll = $true
+$script:installPanel.Controls.Add($softwareScroll)
 
-function Install-Chocolatey {
-    param ($progressDialog)
-    
-    Update-ProgressDialog -dialog $progressDialog -status "Instalando Chocolatey..." -percent 10
-    
-    try {
-        Set-ExecutionPolicy Bypass -Scope Process -Force
-        [System.Net.ServicePointManager]::SecurityProtocol = [System.Net.ServicePointManager]::SecurityProtocol -bor 3072
-        
-        $script = (New-Object System.Net.WebClient).DownloadString('https://community.chocolatey.org/install.ps1')
-        
-        Update-ProgressDialog -dialog $progressDialog -status "Ejecutando instalación..." -percent 50
-        
-        Invoke-Expression $script
-        
-        Update-ProgressDialog -dialog $progressDialog -status "Chocolatey instalado" -percent 100
-        Start-Sleep -Milliseconds 500
-        return $true
-    } catch { 
-        Update-ProgressDialog -dialog $progressDialog -status "Error instalando Chocolatey"
-        Start-Sleep -Seconds 2
-        return $false 
-    }
-}
+$script:allCheckboxes = @()
+$yPos = 15
 
-function Install-Software {
-    param (
-        [string]$id, 
-        [string]$name, 
-        $progressDialog,
-        [int]$stepNumber,
-        [int]$totalSteps
+$softwareList = @{
+    "NAVEGADORES" = @(
+        @{id="Google.Chrome"; name="Google Chrome"},
+        @{id="Mozilla.Firefox"; name="Mozilla Firefox"},
+        @{id="Opera.Opera"; name="Opera GX"},
+        @{id="Microsoft.Edge"; name="Microsoft Edge"},
+        @{id="BraveSoftware.BraveBrowser"; name="Brave Browser"}
     )
+    "DESARROLLO" = @(
+        @{id="Git.Git"; name="Git"},
+        @{id="GitHub.GitHubDesktop"; name="GitHub Desktop"},
+        @{id="Microsoft.VisualStudioCode"; name="Visual Studio Code"},
+        @{id="Notepad++.Notepad++"; name="Notepad++"},
+        @{id="Python.Python.3.12"; name="Python 3.12"},
+        @{id="Oracle.JDK.21"; name="Java JDK 21"}
+    )
+    "MULTIMEDIA" = @(
+        @{id="VideoLAN.VLC"; name="VLC Media Player"},
+        @{id="GIMP.GIMP"; name="GIMP"},
+        @{id="Spotify.Spotify"; name="Spotify"},
+        @{id="Audacity.Audacity"; name="Audacity"},
+        @{id="OBSProject.OBSStudio"; name="OBS Studio"}
+    )
+    "COMUNICACION" = @(
+        @{id="Discord.Discord"; name="Discord"},
+        @{id="Telegram.TelegramDesktop"; name="Telegram"},
+        @{id="WhatsApp.WhatsApp"; name="WhatsApp Desktop"},
+        @{id="Zoom.Zoom"; name="Zoom"},
+        @{id="Microsoft.Teams"; name="Microsoft Teams"}
+    )
+    "UTILIDADES" = @(
+        @{id="7zip.7zip"; name="7-Zip"},
+        @{id="RARLab.WinRAR"; name="WinRAR"},
+        @{id="Microsoft.PowerToys"; name="PowerToys"},
+        @{id="voidtools.Everything"; name="Everything"},
+        @{id="REALiX.HWiNFO"; name="HWiNFO"}
+    )
+    "RUNTIMES" = @(
+        @{id="Microsoft.VCRedist.2015+.x64"; name="Visual C++ 2015-2022 x64"},
+        @{id="Microsoft.VCRedist.2015+.x86"; name="Visual C++ 2015-2022 x86"},
+        @{id="Microsoft.DotNet.DesktopRuntime.8"; name=".NET 8 Desktop Runtime"},
+        @{id="Oracle.JavaRuntimeEnvironment"; name="Java Runtime"}
+    )
+}
+
+foreach ($category in $softwareList.Keys) {
+    $catPanel = New-CategoryPanel -title $category -y $yPos
+    $softwareScroll.Controls.Add($catPanel)
+    $yPos += 35
     
-    if ($script:InstallationCancelled) { return $false }
+    $xPos = 20
+    foreach ($app in $softwareList[$category]) {
+        $cb = New-AppCheckbox -text $app.name -x $xPos -y $yPos
+        $cb.Tag = $app.id
+        $softwareScroll.Controls.Add($cb)
+        $script:allCheckboxes += $cb
+        
+        $xPos += 290
+        if ($xPos -gt 600) {
+            $xPos = 20
+            $yPos += 35
+        }
+    }
+    $yPos += 45
+}
+
+# Panel de botones inferior
+$installBtnPanel = New-Object System.Windows.Forms.Panel
+$installBtnPanel.Location = New-Object System.Drawing.Point(0, 530)
+$installBtnPanel.Size = New-Object System.Drawing.Size(880, 100)
+$installBtnPanel.BackColor = $theme.PanelDark
+$script:installPanel.Controls.Add($installBtnPanel)
+
+$script:selCountLabel = New-Object System.Windows.Forms.Label
+$script:selCountLabel.Text = "Seleccionados: 0"
+$script:selCountLabel.Location = New-Object System.Drawing.Point(20, 15)
+$script:selCountLabel.Size = New-Object System.Drawing.Size(200, 20)
+$script:selCountLabel.Font = $fontNormal
+$script:selCountLabel.ForeColor = $theme.TextSecondary
+$installBtnPanel.Controls.Add($script:selCountLabel)
+
+$script:toggleAllBtn = New-ActionButton -text "Seleccionar Todo" -x 20 -y 45 -width 160 -style "info"
+$script:toggleAllBtn.Add_Click({
+    $script:AllChecked = -not $script:AllChecked
+    foreach ($cb in $script:allCheckboxes) {
+        $cb.Checked = $script:AllChecked
+    }
+    $script:toggleAllBtn.Text = if ($script:AllChecked) { "Deseleccionar Todo" } else { "Seleccionar Todo" }
+    Update-SelectionCount
+})
+$installBtnPanel.Controls.Add($script:toggleAllBtn)
+
+$installSelectedBtn = New-ActionButton -text "Instalar Seleccionados" -x 200 -y 45 -width 180 -style "success"
+$installSelectedBtn.Add_Click({
+    $selected = $script:allCheckboxes | Where-Object { $_.Checked }
+    if ($selected.Count -eq 0) {
+        [System.Windows.Forms.MessageBox]::Show("No hay aplicaciones seleccionadas.", "Aviso", 0, 48)
+        return
+    }
     
-    $basePercent = [int](($stepNumber - 1) / $totalSteps * 100)
-    $endPercent = [int]($stepNumber / $totalSteps * 100)
-    
-    Update-ProgressDialog -dialog $progressDialog -status "Instalando: $name" -step $stepNumber -percent $basePercent
-    
-    $success = $false
     $hasWinget = Test-Winget
     $hasChoco = Test-Chocolatey
     
-    # Intentar con Winget primero
-    if ($hasWinget) {
-        Update-ProgressDialog -dialog $progressDialog -status "Instalando $name via Winget..." -percent ($basePercent + 10)
+    if (-not $hasWinget -and -not $hasChoco) {
+        $result = [System.Windows.Forms.MessageBox]::Show(
+            "Winget no esta disponible.`n`nDesea instalar Chocolatey como alternativa?",
+            "Gestor no encontrado",
+            4, 32
+        )
+        if ($result -ne 6) { return }
         
+        Update-Status "Instalando Chocolatey..."
         try {
-            $proc = Start-Process "winget" -ArgumentList "install", "--id", $id, "--accept-source-agreements", "--accept-package-agreements", "-h" -NoNewWindow -PassThru -Wait -ErrorAction Stop
-            
-            if ($proc.ExitCode -eq 0) { 
-                $success = $true 
-                Update-ProgressDialog -dialog $progressDialog -status "✓ $name instalado correctamente" -percent $endPercent
-            }
+            Set-ExecutionPolicy Bypass -Scope Process -Force
+            [System.Net.ServicePointManager]::SecurityProtocol = 3072
+            Invoke-Expression ((New-Object System.Net.WebClient).DownloadString('https://community.chocolatey.org/install.ps1'))
+            $hasChoco = $true
+            Update-Status "Chocolatey instalado" "success"
         } catch {
-            Update-ProgressDialog -dialog $progressDialog -status "Winget falló, intentando Chocolatey..."
+            Update-Status "Error instalando Chocolatey" "error"
+            return
         }
     }
     
-    # Si falló, intentar con Chocolatey
-    if (-not $success -and $hasChoco) {
-        Update-ProgressDialog -dialog $progressDialog -status "Instalando $name via Chocolatey..." -percent ($basePercent + 30)
+    $script:cancelled = $false
+    $prog = Show-Progress -title "Instalando Aplicaciones" -max $selected.Count
+    $prog.Form.Show()
+    
+    $step = 0
+    $successCount = 0
+    $failCount = 0
+    
+    foreach ($cb in $selected) {
+        if ($script:cancelled) { break }
+        $step++
+        $appId = $cb.Tag
+        $appName = $cb.Text
         
-        try {
-            $cid = $id.Split('.')[-1].ToLower()
-            $proc = Start-Process "choco" -ArgumentList "install", $cid, "-y", "--force" -NoNewWindow -PassThru -Wait -ErrorAction Stop
-            
-            if ($proc.ExitCode -eq 0) { 
-                $success = $true 
-                Update-ProgressDialog -dialog $progressDialog -status "✓ $name instalado correctamente" -percent $endPercent
-            }
-        } catch {
-            Update-ProgressDialog -dialog $progressDialog -status "Chocolatey también falló para $name"
-        }
-    }
-    
-    if (-not $success) {
-        Update-ProgressDialog -dialog $progressDialog -status "✗ Error instalando: $name" -percent $endPercent
-    }
-    
-    Start-Sleep -Milliseconds 300
-    return $success
-}
-
-function Download-And-Install {
-    param ($url, $name, $dest, $progressDialog, $stepNumber, $totalSteps)
-    
-    $basePercent = [int](($stepNumber - 1) / $totalSteps * 100)
-    $endPercent = [int]($stepNumber / $totalSteps * 100)
-    
-    $file = Join-Path $dest $name
-    
-    Update-ProgressDialog -dialog $progressDialog -status "Instalando: $name" -step $stepNumber -percent $basePercent
-    
-    try {
-        if (Test-Path $url) {
-            Copy-Item -Path $url -Destination $file -Force
-            Update-ProgressDialog -dialog $progressDialog -status "Ejecutando instalador..." -percent ($basePercent + 50)
-            
-            $p = Start-Process $file -ArgumentList "/S", "/quiet", "/norestart" -PassThru -Wait -ErrorAction Stop
-            Update-ProgressDialog -dialog $progressDialog -status "✓ $name completado" -percent $endPercent
-            return $true
-        } else {
-            Update-ProgressDialog -dialog $progressDialog -status "✗ Archivo no encontrado: $name"
-            return $false
-        }
-    } catch { 
-        Update-ProgressDialog -dialog $progressDialog -status "✗ Error: $($_.Exception.Message)"
-        return $false 
-    }
-}
-
-# --- FUNCIONES DE ACTIVACIÓN ---
-
-function Open-MASActivation {
-    Update-GlobalStatus "Abriendo Microsoft Activation Scripts..." $colors.Info
-    
-    try {
-        # Buscar el archivo MAS_AIO.cmd
-        $scriptRoot = if ($PSScriptRoot) { $PSScriptRoot } else { $PWD.Path }
-        $masPath = Join-Path $scriptRoot "MAS_AIO.cmd"
+        Update-Progress -dialog $prog -status "Instalando: $appName" -value $step
+        Update-Status "Instalando: $appName"
         
-        if (-not (Test-Path $masPath)) {
-            # Intentar descargar desde GitHub
-            Update-GlobalStatus "Descargando MAS desde GitHub..." $colors.Warning
-            
-            $masUrl = "https://github.com/massgravel/Microsoft-Activation-Scripts/raw/refs/heads/master/MAS/Separate-Files-Version/Activators/MAS_AIO.cmd"
-            
+        $installed = $false
+        
+        if ($hasWinget) {
             try {
-                Invoke-WebRequest -Uri $masUrl -OutFile $masPath -UseBasicParsing
-                Update-GlobalStatus "MAS descargado correctamente" $colors.Success
+                $proc = Start-Process "winget" -ArgumentList "install","--id",$appId,"--accept-source-agreements","--accept-package-agreements","-h" -NoNewWindow -PassThru -Wait -ErrorAction SilentlyContinue
+                if ($proc.ExitCode -eq 0) { $installed = $true }
+            } catch {}
+        }
+        
+        if (-not $installed -and $hasChoco) {
+            try {
+                $chocoId = $appId.Split('.')[-1].ToLower()
+                $proc = Start-Process "choco" -ArgumentList "install",$chocoId,"-y","--force" -NoNewWindow -PassThru -Wait -ErrorAction SilentlyContinue
+                if ($proc.ExitCode -eq 0) { $installed = $true }
+            } catch {}
+        }
+        
+        if ($installed) { $successCount++ } else { $failCount++ }
+    }
+    
+    $prog.Form.Close()
+    
+    if ($script:cancelled) {
+        Update-Status "Instalacion cancelada" "warning"
+    } else {
+        Update-Status "Completado: $successCount exitosos, $failCount fallidos" "success"
+        [System.Windows.Forms.MessageBox]::Show("Instalacion completada.`n`nExitosos: $successCount`nFallidos: $failCount", "Resultado", 0, 64)
+    }
+})
+$installBtnPanel.Controls.Add($installSelectedBtn)
+
+# Actualizar contador de seleccionados
+foreach ($cb in $script:allCheckboxes) {
+    $cb.Add_CheckedChanged({
+        Update-SelectionCount
+    })
+}
+
+function Update-SelectionCount {
+    $count = ($script:allCheckboxes | Where-Object { $_.Checked }).Count
+    $script:selCountLabel.Text = "Seleccionados: $count"
+    $script:toggleAllBtn.Text = if ($count -eq $script:allCheckboxes.Count) { "Deseleccionar Todo" } else { "Seleccionar Todo" }
+    $script:AllChecked = ($count -eq $script:allCheckboxes.Count)
+}
+
+# --- PANEL DE TWEAKS ---
+$script:tweaksPanel = New-Object System.Windows.Forms.Panel
+$script:tweaksPanel.Location = New-Object System.Drawing.Point(0, 0)
+$script:tweaksPanel.Size = New-Object System.Drawing.Size(900, 635)
+$script:tweaksPanel.BackColor = $theme.Background
+$script:tweaksPanel.Visible = $false
+$mainContainer.Controls.Add($script:tweaksPanel)
+
+$headerTweaks = New-Object System.Windows.Forms.Label
+$headerTweaks.Text = "OPTIMIZACIONES DEL SISTEMA"
+$headerTweaks.Location = New-Object System.Drawing.Point(20, 15)
+$headerTweaks.Size = New-Object System.Drawing.Size(400, 30)
+$headerTweaks.Font = $fontHeader
+$headerTweaks.ForeColor = $theme.Accent
+$script:tweaksPanel.Controls.Add($headerTweaks)
+
+$tweaks = @(
+    @{name="Essential Tweaks"; desc="Aplicar tweaks esenciales de rendimiento"; action={
+        Update-Status "Aplicando tweaks esenciales..."
+        $prog = Show-Progress -title "Aplicando Tweaks" -max 5
+        $prog.Form.Show()
+        
+        Update-Progress -dialog $prog -status "Configurando servicios..." -value 1
+        $services = @("DiagTrack","dmwappushservice","WMPNetworkSvc")
+        foreach ($s in $services) {
+            try { Set-Service $s -StartupType Disabled -ErrorAction SilentlyContinue } catch {}
+        }
+        
+        Update-Progress -dialog $prog -status "Configurando telemetria..." -value 2
+        try {
+            reg add "HKLM\SOFTWARE\Policies\Microsoft\Windows\DataCollection" /v AllowTelemetry /t REG_DWORD /d 0 /f | Out-Null
+        } catch {}
+        
+        Update-Progress -dialog $prog -status="Desactivando Cortana..." -value 3
+        try {
+            reg add "HKLM\SOFTWARE\Policies\Microsoft\Windows\Windows Search" /v AllowCortana /t REG_DWORD /d 0 /f | Out-Null
+        } catch {}
+        
+        Update-Progress -dialog $prog -status "Configurando energia..." -value 4
+        try { powercfg /setactive 8c5e7fda-e8bf-4a96-9a85-a6e23a8c635c } catch {}
+        
+        Update-Progress -dialog $prog -status "Completado" -value 5
+        $prog.Form.Close()
+        Update-Status "Tweaks aplicados correctamente" "success"
+    }}
+    @{name="Desactivar Telemetria"; desc="Desactiva completamente la telemetria de Windows"; action={
+        Update-Status "Desactivando telemetria..."
+        try {
+            reg add "HKLM\SOFTWARE\Policies\Microsoft\Windows\DataCollection" /v AllowTelemetry /t REG_DWORD /d 0 /f | Out-Null
+            reg add "HKLM\SOFTWARE\Policies\Microsoft\Windows\PreviewBuilds" /v AllowBuildPreview /t REG_DWORD /d 0 /f | Out-Null
+            Stop-Service "DiagTrack" -Force -ErrorAction SilentlyContinue
+            Set-Service "DiagTrack" -StartupType Disabled -ErrorAction SilentlyContinue
+            Update-Status "Telemetria desactivada" "success"
+        } catch {
+            Update-Status "Error desactivando telemetria" "error"
+        }
+    }}
+    @{name="Desactivar Windows Defender"; desc="Desactiva temporalmente Windows Defender"; action={
+        $result = [System.Windows.Forms.MessageBox]::Show(
+            "Esto desactivara Windows Defender temporalmente.`n`nContinuar?",
+            "Confirmar",
+            4, 48
+        )
+        if ($result -eq 6) {
+            try {
+                Set-MpPreference -DisableRealtimeMonitoring $true -ErrorAction Stop
+                Update-Status "Windows Defender desactivado" "warning"
             } catch {
-                # URL alternativa
-                $masUrl2 = "https://git.activated.win/Microsoft-Activation-Scripts/raw/refs/heads/master/MAS/Separate-Files-Version/Activators/MAS_AIO.cmd"
-                Invoke-WebRequest -Uri $masUrl2 -OutFile $masPath -UseBasicParsing
+                Update-Status "No se pudo desactivar Defender. Use Defender Control." "error"
             }
         }
-        
-        if (Test-Path $masPath) {
-            # Ejecutar MAS en una nueva ventana de CMD
-            Start-Process "cmd.exe" -ArgumentList "/c", "title Microsoft Activation Scripts && color 07 && call `"$masPath`"" -Verb RunAs
-            Update-GlobalStatus "MAS abierto en ventana separada" $colors.Success
-        } else {
-            [System.Windows.Forms.MessageBox]::Show("No se pudo encontrar ni descargar MAS_AIO.cmd", "Error", 0, 16)
-            Update-GlobalStatus "Error al abrir MAS" $colors.Danger
+    }}
+    @{name="Activar Windows Defender"; desc="Reactiva Windows Defender"; action={
+        try {
+            Set-MpPreference -DisableRealtimeMonitoring $false -ErrorAction Stop
+            Update-Status "Windows Defender activado" "success"
+        } catch {
+            Update-Status "Error activando Defender" "error"
         }
-    } catch {
-        [System.Windows.Forms.MessageBox]::Show("Error: $($_.Exception.Message)", "Error", 0, 16)
-        Update-GlobalStatus "Error: $($_.Exception.Message)" $colors.Danger
-    }
-}
-
-function Activate-WindowsTSforge {
-    param ([bool]$windows = $true, [bool]$office = $true, [bool]$esu = $false)
-    
-    Update-GlobalStatus "Iniciando activación TSforge..." $colors.Info
-    
-    $progress = Show-ProgressDialog -title "Activación TSforge" -totalSteps 5
-    
-    try {
-        $progress.Form.Show()
-        [System.Windows.Forms.Application]::DoEvents()
+    }}
+    @{name="Limpiar Archivos Temporales"; desc="Elimina archivos temporales del sistema"; action={
+        Update-Status "Limpiando archivos temporales..."
+        $prog = Show-Progress -title "Limpiando" -max 3
+        $prog.Form.Show()
         
-        # Descargar MAS si no existe
-        Update-ProgressDialog -dialog $progress -status "Verificando MAS..." -step 1 -percent 10
+        Update-Progress -dialog $prog -status "Limpiando TEMP usuario..." -value 1
+        Get-ChildItem "$env:TEMP\*" -Recurse -Force -ErrorAction SilentlyContinue | Remove-Item -Recurse -Force -ErrorAction SilentlyContinue
         
-        $scriptRoot = if ($PSScriptRoot) { $PSScriptRoot } else { $PWD.Path }
-        $masPath = Join-Path $scriptRoot "MAS_AIO.cmd"
+        Update-Progress -dialog $prog -status "Limpiando TEMP Windows..." -value 2
+        Get-ChildItem "$env:windir\Temp\*" -Recurse -Force -ErrorAction SilentlyContinue | Remove-Item -Recurse -Force -ErrorAction SilentlyContinue
         
-        if (-not (Test-Path $masPath)) {
-            Update-ProgressDialog -dialog $progress -status "Descargando MAS..." -percent 20
-            
-            $masUrl = "https://github.com/massgravel/Microsoft-Activation-Scripts/raw/refs/heads/master/MAS/Separate-Files-Version/Activators/MAS_AIO.cmd"
-            Invoke-WebRequest -Uri $masUrl -OutFile $masPath -UseBasicParsing
+        Update-Progress -dialog $prog -status "Completado" -value 3
+        $prog.Form.Close()
+        Update-Status "Archivos temporales eliminados" "success"
+    }}
+    @{name="Optimizar Red"; desc="Resetea la configuracion de red"; action={
+        Update-Status "Optimizando red..."
+        try {
+            netsh int ip reset | Out-Null
+            netsh winsock reset | Out-Null
+            ipconfig /flushdns | Out-Null
+            Update-Status "Red optimizada - Reinicie el equipo" "success"
+        } catch {
+            Update-Status "Error optimizando red" "error"
         }
-        
-        Update-ProgressDialog -dialog $progress -status "Preparando activación..." -step 2 -percent 30
-        
-        # Construir parámetros
-        $params = @()
-        if ($windows) { $params += "/Z-Windows" }
-        if ($office) { $params += "/Z-Office" }
-        if ($esu) { $params += "/Z-ESU" }
-        
-        $paramStr = $params -join " "
-        
-        Update-ProgressDialog -dialog $progress -status "Ejecutando activación..." -step 3 -percent 50
-        
-        # Crear script temporal
-        $tmpCmd = "$env:TEMP\tsforge_act.cmd"
-        "@echo off`ncall `"$masPath`" $paramStr" | Out-File $tmpCmd -Encoding ASCII
-        
-        Update-ProgressDialog -dialog $progress -status "Activando (esto puede tardar)..." -step 4 -percent 70
-        
-        $proc = Start-Process "cmd.exe" -ArgumentList "/c", $tmpCmd -NoNewWindow -PassThru -Wait
-        
-        Update-ProgressDialog -dialog $progress -status "Completado" -step 5 -percent 100
-        
-        Start-Sleep -Milliseconds 500
-        $progress.Form.Close()
-        
-        [System.Windows.Forms.MessageBox]::Show("Proceso de activación completado.`nRevise la ventana de CMD para ver el resultado.", "TSforge", 0, 64)
-        Update-GlobalStatus "Activación TSforge completada" $colors.Success
-        
-    } catch {
-        $progress.Form.Close()
-        [System.Windows.Forms.MessageBox]::Show("Error: $($_.Exception.Message)", "Error", 0, 16)
-        Update-GlobalStatus "Error en activación" $colors.Danger
+    }}
+)
+
+$tweakY = 55
+$tweakX = 20
+$col = 0
+
+foreach ($tweak in $tweaks) {
+    $tweakPanel = New-Object System.Windows.Forms.Panel
+    $tweakPanel.Location = New-Object System.Drawing.Point($tweakX, $tweakY)
+    $tweakPanel.Size = New-Object System.Drawing.Size(280, 80)
+    $tweakPanel.BackColor = $theme.PanelDark
+    $script:tweaksPanel.Controls.Add($tweakPanel)
+    
+    $tweakBtn = New-ActionButton -text $tweak.name -x 5 -y 5 -width 270 -height 35 -style "primary"
+    $tweakBtn.Add_Click($tweak.action)
+    $tweakPanel.Controls.Add($tweakBtn)
+    
+    $tweakDesc = New-Object System.Windows.Forms.Label
+    $tweakDesc.Text = $tweak.desc
+    $tweakDesc.Location = New-Object System.Drawing.Point(10, 45)
+    $tweakDesc.Size = New-Object System.Drawing.Size(260, 30)
+    $tweakDesc.Font = $fontSmall
+    $tweakDesc.ForeColor = $theme.TextMuted
+    $tweakPanel.Controls.Add($tweakDesc)
+    
+    $col++
+    if ($col -ge 3) {
+        $col = 0
+        $tweakX = 20
+        $tweakY += 90
+    } else {
+        $tweakX += 290
     }
 }
 
-function Activate-WithMassgrave {
-    Update-GlobalStatus "Abriendo activador massgrave..." $colors.Info
+# --- PANEL DE ACTIVACION ---
+$script:activatePanel = New-Object System.Windows.Forms.Panel
+$script:activatePanel.Location = New-Object System.Drawing.Point(0, 0)
+$script:activatePanel.Size = New-Object System.Drawing.Size(900, 635)
+$script:activatePanel.BackColor = $theme.Background
+$script:activatePanel.Visible = $false
+$mainContainer.Controls.Add($script:activatePanel)
+
+$headerActivate = New-Object System.Windows.Forms.Label
+$headerActivate.Text = "ACTIVACION DE WINDOWS Y OFFICE"
+$headerActivate.Location = New-Object System.Drawing.Point(20, 15)
+$headerActivate.Size = New-Object System.Drawing.Size(500, 30)
+$headerActivate.Font = $fontHeader
+$headerActivate.ForeColor = $theme.Accent
+$script:activatePanel.Controls.Add($headerActivate)
+
+$descActivate = New-Object System.Windows.Forms.Label
+$descActivate.Text = "Herramientas de activacion para Windows y Microsoft Office"
+$descActivate.Location = New-Object System.Drawing.Point(20, 45)
+$descActivate.Size = New-Object System.Drawing.Size(500, 20)
+$descActivate.Font = $fontSmall
+$descActivate.ForeColor = $theme.TextMuted
+$script:activatePanel.Controls.Add($descActivate)
+
+# Funcion para encontrar MAS
+function Find-MAS {
+    # Buscar en diferentes ubicaciones
+    $paths = @(
+        Join-Path $PWD.Path "MAS_AIO.cmd"
+        Join-Path $PWD.Path "mas\MAS_AIO.cmd"
+        Join-Path $PSScriptRoot "MAS_AIO.cmd"
+        Join-Path $PSScriptRoot "mas\MAS_AIO.cmd"
+    )
     
-    try {
-        # Ejecutar el comando de activación
-        Start-Process "powershell.exe" -ArgumentList "-NoProfile -ExecutionPolicy Bypass -Command `"irm https://get.activated.win | iex`"" -Verb RunAs
-        Update-GlobalStatus "Activador massgrave iniciado" $colors.Success
-    } catch {
-        [System.Windows.Forms.MessageBox]::Show("Error: $($_.Exception.Message)", "Error", 0, 16)
-        Update-GlobalStatus "Error al abrir activador" $colors.Danger
+    foreach ($p in $paths) {
+        if (Test-Path $p) { return $p }
     }
+    
+    return $null
 }
 
-function Activate-WithWinUtil {
-    Update-GlobalStatus "Abriendo WinUtil (Chris Titus)..." $colors.Info
+function Download-MAS {
+    param ($destPath)
+    
+    Update-Status "Descargando MAS..."
     
     try {
-        Start-Process "powershell.exe" -ArgumentList "-NoProfile -ExecutionPolicy Bypass -Command `"irm https://christitus.com/win | iex`"" -Verb RunAs
-        Update-GlobalStatus "WinUtil iniciado" $colors.Success
-    } catch {
-        [System.Windows.Forms.MessageBox]::Show("Error: $($_.Exception.Message)", "Error", 0, 16)
-        Update-GlobalStatus "Error al abrir WinUtil" $colors.Danger
-    }
-}
-
-# --- FUNCIONES DE UTILIDADES ---
-
-function Initialize-Installers {
-    $root = if ($PSScriptRoot) { $PSScriptRoot } else { $PWD.Path }
-    $dir = Join-Path $root "instaladores"
-    if (-not (Test-Path $dir)) { New-Item -ItemType Directory -Path $dir -Force | Out-Null }
-    if (Test-Path $dir) { return Get-ChildItem $dir -Filter "*.exe" }
-    return @()
-}
-
-function Download-InstallersFromGitHub {
-    param ($dest)
-    
-    $progress = Show-ProgressDialog -title "Descargando Instaladores" -totalSteps 4
-    $progress.Form.Show()
-    [System.Windows.Forms.Application]::DoEvents()
-    
-    try {
-        Update-ProgressDialog -dialog $progress -status "Conectando a GitHub..." -step 1 -percent 10
+        $urls = @(
+            "https://github.com/massgravel/Microsoft-Activation-Scripts/raw/refs/heads/master/MAS/Separate-Files-Version/Activators/MAS_AIO.cmd",
+            "https://git.activated.win/Microsoft-Activation-Scripts/raw/refs/heads/master/MAS/Separate-Files-Version/Activators/MAS_AIO.cmd"
+        )
         
-        $url = "https://github.com/WalterShadow2001/shadowiex/archive/refs/heads/main.zip"
-        $zip = "$env:TEMP\shadowiex.zip"
-        $ext = "$env:TEMP\shadowiex_ext"
-        
-        Update-ProgressDialog -dialog $progress -status "Descargando archivos..." -step 2 -percent 30
-        Invoke-WebRequest $url -OutFile $zip -UseBasicParsing
-        
-        Update-ProgressDialog -dialog $progress -status "Extrayendo archivos..." -step 3 -percent 60
-        if (Test-Path $ext) { Remove-Item $ext -Recurse -Force }
-        Expand-Archive $zip $ext -Force
-        
-        $src = Join-Path $ext "shadowiex-main\instaladores"
-        if (Test-Path $src) { 
-            Copy-Item "$src\*.exe" $dest -Force -ErrorAction SilentlyContinue
+        foreach ($url in $urls) {
+            try {
+                Invoke-WebRequest -Uri $url -OutFile $destPath -UseBasicParsing -TimeoutSec 30
+                if (Test-Path $destPath) {
+                    Update-Status "MAS descargado correctamente" "success"
+                    return $true
+                }
+            } catch { continue }
         }
         
-        Update-ProgressDialog -dialog $progress -status "Limpiando temporales..." -step 4 -percent 90
-        Remove-Item $zip, $ext -Recurse -Force -ErrorAction SilentlyContinue
-        
-        Update-ProgressDialog -dialog $progress -status "Completado" -percent 100
-        Start-Sleep -Milliseconds 500
-        $progress.Form.Close()
-        
-        [System.Windows.Forms.MessageBox]::Show("Instaladores descargados correctamente.", "Éxito", 0, 64)
-        return $true
+        return $false
     } catch {
-        $progress.Form.Close()
-        [System.Windows.Forms.MessageBox]::Show("Error: $($_.Exception.Message)", "Error", 0, 16)
         return $false
     }
 }
 
-# --- DATA SOFTWARE ---
- $softwareCategories = @{
-    "Navegadores" = @(
-        @{id="Google.Chrome";n="Google Chrome";i="🌐"},
-        @{id="Mozilla.Firefox";n="Mozilla Firefox";i="🦊"},
-        @{id="Opera.Opera";n="Opera GX";i="🎭"},
-        @{id="Microsoft.Edge";n="Microsoft Edge";i="🔵"},
-        @{id="BraveSoftware.BraveBrowser";n="Brave Browser";i="🦁"}
-    )
-    "Desarrollo" = @(
-        @{id="Git.Git";n="Git";i="📁"},
-        @{id="GitHub.GitHubDesktop";n="GitHub Desktop";i="🐙"},
-        @{id="Microsoft.VisualStudioCode";n="VS Code";i="🔧"},
-        @{id="Notepad++.Notepad++";n="Notepad++";i="📝"},
-        @{id="Python.Python.3";n="Python 3";i="🐍"},
-        @{id="Oracle.JDK.17";n="Oracle JDK 17";i="☕"}
-    )
-    "Multimedia" = @(
-        @{id="VideoLAN.VLC";n="VLC Media Player";i="🎵"},
-        @{id="GIMP.GIMP";n="GIMP";i="🎨"},
-        @{id="IrfanSkiljan.IrfanView";n="IrfanView";i="🖼️"},
-        @{id="Spotify.Spotify";n="Spotify";i="🎧"},
-        @{id="KDE.Kdenlive";n="Kdenlive";i="🎬"}
-    )
-    "Comunicación" = @(
-        @{id="Zoom.Zoom";n="Zoom";i="📞"},
-        @{id="Microsoft.Teams";n="Microsoft Teams";i="👥"},
-        @{id="Discord.Discord";n="Discord";i="💬"},
-        @{id="Telegram.TelegramDesktop";n="Telegram";i="📱"},
-        @{id="WhatsApp.WhatsApp";n="WhatsApp Desktop";i="💬"},
-        @{id="Slack.Slack";n="Slack";i="📋"}
-    )
-    "Utilidades" = @(
-        @{id="7zip.7zip";n="7-Zip";i="🗜️"},
-        @{id="Adobe.Acrobat.Reader.64-bit";n="Adobe Reader";i="📄"},
-        @{id="RARLab.WinRAR";n="WinRAR";i="🗜️"},
-        @{id="TeamViewer.TeamViewer";n="TeamViewer";i="👥"},
-        @{id="Rufus.Rufus";n="Rufus";i="🔧"},
-        @{id="Balena.Etcher";n="Etcher";i="💾"},
-        @{id="REALiX.HWiNFO";n="HWiNFO";i="📊"}
-    )
-    "Runtimes" = @(
-        @{id="Oracle.JavaRuntimeEnvironment";n="Java Runtime";i="☕"},
-        @{id="Microsoft.DotNet.Runtime.6";n=".NET 6 Runtime";i="🟢"},
-        @{id="Microsoft.DotNet.Runtime.7";n=".NET 7 Runtime";i="🟢"},
-        @{id="Microsoft.DotNet.DesktopRuntime.6";n=".NET 6 Desktop";i="🟢"},
-        @{id="Microsoft.VCRedist.2015+.x64";n="Visual C++ Redist";i="🔴"},
-        @{id="Microsoft.DirectX";n="DirectX End-User";i="🎮"}
-    )
-}
-
-# --- POBLAR TABS ---
-
-function Populate-SoftwareTab {
-    $tabBasicSoftware.Controls.Clear()
-    
-    # Panel con scroll
-    $pnl = New-Object System.Windows.Forms.Panel
-    $pnl.AutoScroll = $true
-    $pnl.Location = New-Object System.Drawing.Point(10, 10)
-    $pnl.Size = New-Object System.Drawing.Size(920, 380)
-    $pnl.BackColor = $colors.Panel
-    $pnl.Padding = New-Object System.Windows.Forms.Padding(10)
-    $tabBasicSoftware.Controls.Add($pnl)
-
-    $global:allCheckboxes = @()
-    $y = 10
-    $font = New-Object System.Drawing.Font("Segoe UI", 9.5, $styleRegular)
-
-    foreach ($cat in $softwareCategories.Keys) {
-        # Título de categoría
-        $lbl = Create-ModernLabel -text "■ $cat" -x 10 -y $y -isTitle $true
-        $lbl.ForeColor = $colors.Accent
-        $pnl.Controls.Add($lbl)
-        $y += 38
+# Botones de activacion
+$activateButtons = @(
+    @{name="MAS Interactivo"; desc="Abre MAS en modo interactivo con menu completo"; style="success"; action={
+        Update-Status "Buscando MAS..."
         
-        foreach ($sw in $softwareCategories[$cat]) {
-            $cb = New-Object System.Windows.Forms.CheckBox
-            $cb.Text = "$($sw.i)  $($sw.n)"
-            $cb.Location = New-Object System.Drawing.Point(25, $y)
-            $cb.Size = New-Object System.Drawing.Size(550, 28)
-            $cb.Font = $font
-            $cb.ForeColor = $colors.Text
-            $cb.BackColor = $colors.Panel
-            $cb.Padding = New-Object System.Windows.Forms.Padding(5)
-            $cb.FlatStyle = [System.Windows.Forms.FlatStyle]::Flat
-            $pnl.Controls.Add($cb)
-            $global:allCheckboxes += @{cb=$cb; id=$sw.id; n=$sw.n}
-            $y += 32
-        }
-        $y += 15
-    }
-
-    # Panel de botones inferior
-    $btnPanel = New-Object System.Windows.Forms.Panel
-    $btnPanel.Location = New-Object System.Drawing.Point(10, 400)
-    $btnPanel.Size = New-Object System.Drawing.Size(920, 60)
-    $btnPanel.BackColor = $colors.PanelLight
-    $tabBasicSoftware.Controls.Add($btnPanel)
-
-    $btnInstall = Create-ModernButton -text "📦 Instalar Selección" -x 15 -y 10 -width 180 -action {
-        $sel = $global:allCheckboxes | Where-Object { $_.cb.Checked }
-        if ($sel.Count -eq 0) { 
-            [System.Windows.Forms.MessageBox]::Show("Seleccione al menos un programa para instalar.", "Información", 0, 48)
-            return 
-        }
+        $masPath = Find-MAS
+        $scriptRoot = if ($PSScriptRoot) { $PSScriptRoot } else { $PWD.Path }
+        $downloadPath = Join-Path $scriptRoot "MAS_AIO.cmd"
         
-        $wg = Test-Winget
-        $ch = Test-Chocolatey
-        
-        if (-not $wg -and -not $ch) { 
+        if (-not $masPath) {
             $result = [System.Windows.Forms.MessageBox]::Show(
-                "No se encontró Winget ni Chocolatey.`n`n¿Desea instalar Winget ahora?", 
-                "Gestores no encontrados", 
+                "MAS_AIO.cmd no encontrado en la carpeta.`n`nDesea descargarlo automaticamente?",
+                "MAS no encontrado",
                 4, 32
             )
-            if ($result -eq 6) { # Sí
-                $prog = Show-ProgressDialog -title "Instalando Winget" -totalSteps 1
-                $prog.Form.Show()
-                [System.Windows.Forms.Application]::DoEvents()
-                
-                $installed = Install-Winget -progressDialog $prog
-                $prog.Form.Close()
-                
-                if (-not $installed) {
-                    $result2 = [System.Windows.Forms.MessageBox]::Show(
-                        "Winget falló. ¿Instalar Chocolatey?", 
-                        "Alternativa", 
-                        4, 32
-                    )
-                    if ($result2 -eq 6) {
-                        $prog = Show-ProgressDialog -title "Instalando Chocolatey" -totalSteps 1
-                        $prog.Form.Show()
-                        [System.Windows.Forms.Application]::DoEvents()
-                        Install-Chocolatey -progressDialog $prog
-                        $prog.Form.Close()
-                    }
+            if ($result -eq 6) {
+                if (-not (Download-MAS -destPath $downloadPath)) {
+                    Update-Status "Error descargando MAS" "error"
+                    return
                 }
-            }
-        }
-        
-        $script:InstallationCancelled = $false
-        $progress = Show-ProgressDialog -title "Instalando Software" -totalSteps $sel.Count
-        $progress.Form.Show()
-        [System.Windows.Forms.Application]::DoEvents()
-        
-        $step = 0
-        foreach ($s in $sel) { 
-            if ($script:InstallationCancelled) { break }
-            $step++
-            Install-Software -id $s.id -name $s.n -progressDialog $progress -stepNumber $step -totalSteps $sel.Count
-        }
-        
-        $progress.Form.Close()
-        
-        if (-not $script:InstallationCancelled) {
-            [System.Windows.Forms.MessageBox]::Show("Instalación completada.", "Shadowiex", 0, 64)
-            Update-GlobalStatus "Instalación completada" $colors.Success
-        } else {
-            Update-GlobalStatus "Instalación cancelada por el usuario" $colors.Warning
-        }
-    }
-    $btnPanel.Controls.Add($btnInstall)
-    
-    $btnSelAll = Create-ModernButton -text "✓ Seleccionar Todo" -x 210 -y 10 -width 150 -backColor $colors.Panel -action {
-        foreach($i in $global:allCheckboxes){ $i.cb.Checked = $true }
-        Update-GlobalStatus "Todo seleccionado" $colors.Info
-    }
-    $btnPanel.Controls.Add($btnSelAll)
-    
-    $btnDesel = Create-ModernButton -text "✗ Deseleccionar" -x 375 -y 10 -width 150 -backColor $colors.Panel -action {
-        foreach($i in $global:allCheckboxes){ $i.cb.Checked = $false }
-        Update-GlobalStatus "Selección limpiada" $colors.Info
-    }
-    $btnPanel.Controls.Add($btnDesel)
-    
-    # Contador de seleccionados
-    $lblCount = Create-ModernLabel -text "Seleccionados: 0" -x 540 -y 18 -width 150
-    $lblCount.ForeColor = $colors.TextSub
-    $btnPanel.Controls.Add($lblCount)
-    
-    # Actualizar contador cuando cambie la selección
-    foreach ($item in $global:allCheckboxes) {
-        $item.cb.Add_CheckedChanged({
-            $count = ($global:allCheckboxes | Where-Object { $_.cb.Checked }).Count
-            $lblCount.Text = "Seleccionados: $count"
-        })
-    }
-}
-
-function Populate-InstallersTab {
-    $tabInstallers.Controls.Clear()
-    
-    $lblTitle = Create-ModernLabel -text "Gestor de Instaladores Personalizados" -x 15 -y 10 -isTitle $true
-    $tabInstallers.Controls.Add($lblTitle)
-
-    # Lista de instaladores
-    $list = New-Object System.Windows.Forms.ListBox
-    $list.Location = New-Object System.Drawing.Point(15, 50)
-    $list.Size = New-Object System.Drawing.Size(650, 340)
-    $list.BackColor = $colors.Panel
-    $list.ForeColor = $colors.Text
-    $list.Font = New-Object System.Drawing.Font("Segoe UI", 10, $styleRegular)
-    $list.HorizontalScrollbar = $true
-    $list.BorderStyle = [System.Windows.Forms.BorderStyle]::FixedSingle
-    $tabInstallers.Controls.Add($list)
-    $script:UIControls['List'] = $list
-
-    $refreshAction = {
-        $l = $script:UIControls['List']
-        if($l) { 
-            $l.Items.Clear()
-            $files = Initialize-Installers
-            foreach($f in $files){ $l.Items.Add($f.Name) }
-            Update-GlobalStatus "Lista actualizada: $($files.Count) instaladores" $colors.Info
-        }
-    }
-
-    # Panel de botones
-    $btnPanel = New-Object System.Windows.Forms.Panel
-    $btnPanel.Location = New-Object System.Drawing.Point(680, 50)
-    $btnPanel.Size = New-Object System.Drawing.Size(180, 350)
-    $btnPanel.BackColor = $colors.PanelLight
-    $tabInstallers.Controls.Add($btnPanel)
-
-    $btnRefresh = Create-ModernButton -text "🔄 Actualizar Lista" -x 10 -y 15 -width 160 -action $refreshAction
-    $btnPanel.Controls.Add($btnRefresh)
-
-    $btnDl = Create-ModernButton -text "⬇️ Descargar GitHub" -x 10 -y 65 -width 160 -action {
-        $root = if ($PSScriptRoot) { $PSScriptRoot } else { $PWD.Path }
-        Download-InstallersFromGitHub -dest $root
-        Start-Sleep -Milliseconds 500
-        & $refreshAction
-    }
-    $btnPanel.Controls.Add($btnDl)
-    
-    $btnInstall = Create-ModernButton -text "▶️ Instalar" -x 10 -y 115 -width 160 -backColor $colors.Success -action {
-        $l = $script:UIControls['List']
-        if($l.SelectedIndex -eq -1) { 
-            [System.Windows.Forms.MessageBox]::Show("Seleccione un instalador de la lista.", "Información", 0, 48)
-            return 
-        }
-        
-        $itemName = $l.SelectedItem
-        $root = if ($PSScriptRoot) { $PSScriptRoot } else { $PWD.Path }
-        $file = Join-Path (Join-Path $root "instaladores") $itemName
-        
-        if (Test-Path $file) {
-            $progress = Show-ProgressDialog -title "Instalando $itemName" -totalSteps 1
-            $progress.Form.Show()
-            [System.Windows.Forms.Application]::DoEvents()
-            
-            Update-ProgressDialog -dialog $progress -status "Ejecutando instalador..." -step 1 -percent 50
-            
-            try {
-                Start-Process $file -ArgumentList "/S", "/quiet" -Wait -ErrorAction Stop
-                Update-ProgressDialog -dialog $progress -status "Completado" -percent 100
-                Start-Sleep -Milliseconds 500
-                $progress.Form.Close()
-                [System.Windows.Forms.MessageBox]::Show("Instalador ejecutado correctamente.", "Listo", 0, 64)
-            } catch {
-                $progress.Form.Close()
-                [System.Windows.Forms.MessageBox]::Show("Error: $($_.Exception.Message)", "Error", 0, 16)
-            }
-        } else {
-            [System.Windows.Forms.MessageBox]::Show("Archivo no encontrado.", "Error", 0, 16)
-        }
-    }
-    $btnPanel.Controls.Add($btnInstall)
-    
-    $btnInstallAll = Create-ModernButton -text "📦 Instalar Todo" -x 10 -y 165 -width 160 -backColor $colors.Warning -action {
-        $l = $script:UIControls['List']
-        if ($l.Items.Count -eq 0) {
-            [System.Windows.Forms.MessageBox]::Show("No hay instaladores en la lista.", "Información", 0, 48)
-            return
-        }
-        
-        $root = if ($PSScriptRoot) { $PSScriptRoot } else { $PWD.Path }
-        $dir = Join-Path $root "instaladores"
-        $files = Get-ChildItem $dir -Filter "*.exe"
-        
-        $progress = Show-ProgressDialog -title "Instalando Todos" -totalSteps $files.Count
-        $progress.Form.Show()
-        [System.Windows.Forms.Application]::DoEvents()
-        
-        $step = 0
-        foreach ($f in $files) {
-            $step++
-            $filePath = Join-Path $dir $f.Name
-            Download-And-Install -url $filePath -name $f.Name -dest $dir -progressDialog $progress -stepNumber $step -totalSteps $files.Count
-        }
-        
-        $progress.Form.Close()
-        [System.Windows.Forms.MessageBox]::Show("Instalación de todos los archivos completada.", "Listo", 0, 64)
-    }
-    $btnPanel.Controls.Add($btnInstallAll)
-    
-    # Cargar lista inicial
-    & $refreshAction
-}
-
-function Populate-ActivationsTab {
-    $tabActivations.Controls.Clear()
-    
-    # Sección de Activación MAS
-    $lblMas = Create-ModernLabel -text "Microsoft Activation Scripts (MAS)" -x 20 -y 15 -isTitle $true
-    $lblMas.ForeColor = $colors.Accent
-    $tabActivations.Controls.Add($lblMas)
-    
-    $lblMasDesc = Create-ModernLabel -text "Activación completa de Windows y Office con múltiples métodos" -x 20 -y 50 -width 600
-    $lblMasDesc.ForeColor = $colors.TextSub
-    $tabActivations.Controls.Add($lblMasDesc)
-    
-    $btnOpenMAS = Create-ModernButton -text "🖥️ Abrir MAS (Interactivo)" -x 20 -y 80 -width 200 -backColor $colors.Success -action {
-        Open-MASActivation
-    }
-    $tabActivations.Controls.Add($btnOpenMAS)
-    
-    $btnTSforgeWin = Create-ModernButton -text "🔑 Activar Windows (TSforge)" -x 235 -y 80 -width 200 -action {
-        Activate-WindowsTSforge -windows $true -office $false
-    }
-    $tabActivations.Controls.Add($btnTSforgeWin)
-    
-    $btnTSforgeAll = Create-ModernButton -text "🔑 Activar Windows + Office" -x 450 -y 80 -width 200 -backColor $colors.Info -action {
-        Activate-WindowsTSforge -windows $true -office $true
-    }
-    $tabActivations.Controls.Add($btnTSforgeAll)
-    
-    # Sección de Otros Activadores
-    $lblOther = Create-ModernLabel -text "Otros Métodos de Activación" -x 20 -y 140 -isTitle $true
-    $lblOther.ForeColor = $colors.Accent
-    $tabActivations.Controls.Add($lblOther)
-    
-    $btnMassgrave = Create-ModernButton -text "⚡ Activated.Win" -x 20 -y 175 -width 200 -backColor $colors.Danger -action {
-        Activate-WithMassgrave
-    }
-    $tabActivations.Controls.Add($btnMassgrave)
-    
-    $btnWinUtil = Create-ModernButton -text "🛠️ WinUtil (Chris Titus)" -x 235 -y 175 -width 200 -action {
-        Activate-WithWinUtil
-    }
-    $tabActivations.Controls.Add($btnWinUtil)
-    
-    # Separador
-    $sepLine = New-Object System.Windows.Forms.Panel
-    $sepLine.Location = New-Object System.Drawing.Point(20, 235)
-    $sepLine.Size = New-Object System.Drawing.Size(700, 2)
-    $sepLine.BackColor = $colors.PanelLight
-    $tabActivations.Controls.Add($sepLine)
-    
-    # Sección de Optimización
-    $lblOpt = Create-ModernLabel -text "Optimización del Sistema" -x 20 -y 260 -isTitle $true
-    $lblOpt.ForeColor = $colors.Accent
-    $tabActivations.Controls.Add($lblOpt)
-    
-    $btnNet = Create-ModernButton -text "🌐 Optimizar Red" -x 20 -y 295 -width 170 -action {
-        $progress = Show-ProgressDialog -title "Optimizando Red" -totalSteps 4
-        $progress.Form.Show()
-        [System.Windows.Forms.Application]::DoEvents()
-        
-        Update-ProgressDialog -dialog $progress -status "Reseteando IP..." -step 1 -percent 25
-        netsh int ip reset | Out-Null
-        
-        Update-ProgressDialog -dialog $progress -status "Reseteando Winsock..." -step 2 -percent 50
-        netsh winsock reset | Out-Null
-        
-        Update-ProgressDialog -dialog $progress -status "Limpiando DNS..." -step 3 -percent 75
-        ipconfig /flushdns | Out-Null
-        
-        Update-ProgressDialog -dialog $progress -status "Completado" -step 4 -percent 100
-        Start-Sleep -Milliseconds 500
-        $progress.Form.Close()
-        
-        [System.Windows.Forms.MessageBox]::Show("Red optimizada correctamente.`nSe recomienda reiniciar el equipo.", "Listo", 0, 64)
-        Update-GlobalStatus "Red optimizada" $colors.Success
-    }
-    $tabActivations.Controls.Add($btnNet)
-    
-    $btnSys = Create-ModernButton -text "⚙️ Optimizar Servicios" -x 200 -y 295 -width 170 -action {
-        $progress = Show-ProgressDialog -title "Optimizando Servicios" -totalSteps 1
-        $progress.Form.Show()
-        [System.Windows.Forms.Application]::DoEvents()
-        
-        Update-ProgressDialog -dialog $progress -status "Deshabilitando servicios innecesarios..." -step 1 -percent 50
-        
-        $srv = @("DiagTrack", "dmwappushservice", "MapsBroker", "SharedAccess")
-        $disabled = 0
-        foreach($s in $srv) {
-            try {
-                Set-Service $s -StartupType Disabled -ErrorAction SilentlyContinue
-                Stop-Service $s -Force -ErrorAction SilentlyContinue
-                $disabled++
-            } catch {}
-        }
-        
-        Update-ProgressDialog -dialog $progress -status "Completado" -percent 100
-        Start-Sleep -Milliseconds 500
-        $progress.Form.Close()
-        
-        [System.Windows.Forms.MessageBox]::Show("$disabled servicios optimizados.", "Listo", 0, 64)
-        Update-GlobalStatus "Servicios optimizados" $colors.Success
-    }
-    $tabActivations.Controls.Add($btnSys)
-    
-    $btnClean = Create-ModernButton -text "🗑️ Limpiar Temporales" -x 380 -y 295 -width 170 -backColor $colors.Warning -action {
-        $progress = Show-ProgressDialog -title "Limpiando Temporales" -totalSteps 2
-        $progress.Form.Show()
-        [System.Windows.Forms.Application]::DoEvents()
-        
-        Update-ProgressDialog -dialog $progress -status "Limpiando carpeta TEMP del usuario..." -step 1 -percent 25
-        $removed1 = 0
-        try {
-            Get-ChildItem "$env:TEMP\*" -Recurse -Force -ErrorAction SilentlyContinue | Remove-Item -Recurse -Force -ErrorAction SilentlyContinue
-            $removed1 = 1
-        } catch {}
-        
-        Update-ProgressDialog -dialog $progress -status "Limpiando carpeta TEMP de Windows..." -step 2 -percent 75
-        $removed2 = 0
-        try {
-            Get-ChildItem "$env:windir\Temp\*" -Recurse -Force -ErrorAction SilentlyContinue | Remove-Item -Recurse -Force -ErrorAction SilentlyContinue
-            $removed2 = 1
-        } catch {}
-        
-        Update-ProgressDialog -dialog $progress -status "Completado" -percent 100
-        Start-Sleep -Milliseconds 500
-        $progress.Form.Close()
-        
-        [System.Windows.Forms.MessageBox]::Show("Archivos temporales limpiados.", "Listo", 0, 64)
-        Update-GlobalStatus "Temporales limpiados" $colors.Success
-    }
-    $tabActivations.Controls.Add($btnClean)
-    
-    $btnDisk = Create-ModernButton -text "💿 Limpiar Disco" -x 560 -y 295 -width 170 -action {
-        Start-Process "cleanmgr.exe" -ArgumentList "/d C" -Wait
-        Update-GlobalStatus "Limpieza de disco completada" $colors.Success
-    }
-    $tabActivations.Controls.Add($btnDisk)
-    
-    # Sección de Windows Defender
-    $lblDef = Create-ModernLabel -text "Windows Defender" -x 20 -y 360 -isTitle $true
-    $lblDef.ForeColor = $colors.Accent
-    $tabActivations.Controls.Add($lblDef)
-    
-    $btnDefEnable = Create-ModernButton -text "🛡️ Activar Defender" -x 20 -y 395 -width 170 -backColor $colors.Success -action {
-        try {
-            Set-MpPreference -DisableRealtimeMonitoring $false -ErrorAction Stop
-            [System.Windows.Forms.MessageBox]::Show("Windows Defender activado.", "Listo", 0, 64)
-            Update-GlobalStatus "Defender activado" $colors.Success
-        } catch {
-            [System.Windows.Forms.MessageBox]::Show("Error: $($_.Exception.Message)`n`nEs posible que necesite permisos de administrador.", "Error", 0, 16)
-        }
-    }
-    $tabActivations.Controls.Add($btnDefEnable)
-    
-    $btnDefDisable = Create-ModernButton -text "⚠️ Desactivar Defender" -x 200 -y 395 -width 170 -backColor $colors.Danger -action {
-        $result = [System.Windows.Forms.MessageBox]::Show(
-            "¿Está seguro de que desea desactivar Windows Defender?`n`nEsto dejará su equipo vulnerable.", 
-            "Confirmar", 
-            4, 48
-        )
-        if ($result -eq 6) { # Sí
-            try {
-                Set-MpPreference -DisableRealtimeMonitoring $true -ErrorAction Stop
-                [System.Windows.Forms.MessageBox]::Show("Windows Defender desactivado temporalmente.`n`nNota: Puede reactivarse automáticamente.", "Listo", 0, 64)
-                Update-GlobalStatus "Defender desactivado" $colors.Warning
-            } catch {
-                [System.Windows.Forms.MessageBox]::Show("Error: $($_.Exception.Message)`n`nEs posible que necesite usar una herramienta externa como Defender Control.", "Error", 0, 16)
-            }
-        }
-    }
-    $tabActivations.Controls.Add($btnDefDisable)
-    
-    $btnDefControl = Create-ModernButton -text "🔧 Defender Control" -x 380 -y 395 -width 170 -action {
-        try {
-            # Descargar Defender Control si no existe
-            $dcPath = "$env:TEMP\DefenderControl.exe"
-            if (-not (Test-Path $dcPath)) {
-                $dcUrl = "https://www.sordum.org/files/download/d-control/DefenderControl.zip"
-                $zipPath = "$env:TEMP\DefenderControl.zip"
-                Invoke-WebRequest -Uri $dcUrl -OutFile $zipPath -UseBasicParsing
-                Expand-Archive $zipPath "$env:TEMP\DefenderControl" -Force
-                $dcPath = Get-ChildItem "$env:TEMP\DefenderControl" -Recurse -Filter "*.exe" | Select-Object -First 1 -ExpandProperty FullName
-            }
-            if (Test-Path $dcPath) {
-                Start-Process $dcPath
-            }
-        } catch {
-            [System.Windows.Forms.MessageBox]::Show("Error descargando Defender Control.", "Error", 0, 16)
-        }
-    }
-    $tabActivations.Controls.Add($btnDefControl)
-}
-
-function Populate-SettingsTab {
-    $tabSettings.Controls.Clear()
-    
-    $lbl = Create-ModernLabel -text "Configuración del Sistema" -x 20 -y 15 -isTitle $true
-    $tabSettings.Controls.Add($lbl)
-    
-    # Estado de gestores
-    $sw = Test-Winget
-    $sc = Test-Chocolatey
-    $statusW = if($sw){"✓ Instalado"}else{"✗ No encontrado"}
-    $statusC = if($sc){"✓ Instalado"}else{"✗ No encontrado"}
-    $colorW = if($sw){$colors.Success}else{$colors.Danger}
-    $colorC = if($sc){$colors.Success}else{$colors.Danger}
-    
-    $tabSettings.Controls.Add((Create-ModernLabel -text "Winget:" -x 20 -y 60 -width 100))
-    $lblW = Create-ModernLabel -text $statusW -x 130 -y 60 -foreColor $colorW
-    $tabSettings.Controls.Add($lblW)
-    
-    $tabSettings.Controls.Add((Create-ModernLabel -text "Chocolatey:" -x 20 -y 90 -width 100))
-    $lblC = Create-ModernLabel -text $statusC -x 130 -y 90 -foreColor $colorC
-    $tabSettings.Controls.Add($lblC)
-    
-    # Botones de instalación de gestores
-    if (-not $sw) {
-        $btnInstW = Create-ModernButton -text "📥 Instalar Winget" -x 300 -y 55 -width 160 -action {
-            $progress = Show-ProgressDialog -title "Instalando Winget" -totalSteps 1
-            $progress.Form.Show()
-            [System.Windows.Forms.Application]::DoEvents()
-            
-            $result = Install-Winget -progressDialog $progress
-            $progress.Form.Close()
-            
-            if ($result) {
-                [System.Windows.Forms.MessageBox]::Show("Winget instalado correctamente.", "Éxito", 0, 64)
-                Populate-SettingsTab
+                $masPath = $downloadPath
             } else {
-                [System.Windows.Forms.MessageBox]::Show("Error instalando Winget.", "Error", 0, 16)
+                return
             }
         }
-        $tabSettings.Controls.Add($btnInstW)
-    }
-    
-    if (-not $sc) {
-        $btnInstC = Create-ModernButton -text "📥 Instalar Chocolatey" -x 300 -y 85 -width 160 -action {
-            $progress = Show-ProgressDialog -title "Instalando Chocolatey" -totalSteps 1
-            $progress.Form.Show()
-            [System.Windows.Forms.Application]::DoEvents()
-            
-            $result = Install-Chocolatey -progressDialog $progress
-            $progress.Form.Close()
-            
-            if ($result) {
-                [System.Windows.Forms.MessageBox]::Show("Chocolatey instalado correctamente.", "Éxito", 0, 64)
-                Populate-SettingsTab
-            } else {
-                [System.Windows.Forms.MessageBox]::Show("Error instalando Chocolatey.", "Error", 0, 16)
-            }
+        
+        if ($masPath -and (Test-Path $masPath)) {
+            Update-Status "Abriendo MAS..."
+            Start-Process "cmd.exe" -ArgumentList "/c", "title MAS - Microsoft Activation Scripts && color 07 && call `"$masPath`"" -Verb RunAs
+            Update-Status "MAS abierto en ventana separada" "success"
+        } else {
+            Update-Status "No se pudo encontrar MAS" "error"
         }
-        $tabSettings.Controls.Add($btnInstC)
-    }
-    
-    # Separador
-    $sepLine = New-Object System.Windows.Forms.Panel
-    $sepLine.Location = New-Object System.Drawing.Point(20, 130)
-    $sepLine.Size = New-Object System.Drawing.Size(700, 2)
-    $sepLine.BackColor = $colors.PanelLight
-    $tabSettings.Controls.Add($sepLine)
-    
-    # Actualización del script
-    $lblUpdate = Create-ModernLabel -text "Actualización del Script" -x 20 -y 150 -isTitle $true
-    $tabSettings.Controls.Add($lblUpdate)
-    
-    $btnUp = Create-ModernButton -text "🔄 Actualizar Script" -x 20 -y 190 -width 200 -action {
+    }}
+    @{name="Activar Windows"; desc="Activacion automatica de Windows con TSforge"; style="primary"; action={
+        Update-Status "Preparando activacion de Windows..."
+        
+        $masPath = Find-MAS
+        $scriptRoot = if ($PSScriptRoot) { $PSScriptRoot } else { $PWD.Path }
+        $downloadPath = Join-Path $scriptRoot "MAS_AIO.cmd"
+        
+        if (-not $masPath) {
+            if (-not (Download-MAS -destPath $downloadPath)) {
+                Update-Status "Error descargando MAS" "error"
+                return
+            }
+            $masPath = $downloadPath
+        }
+        
+        if ($masPath -and (Test-Path $masPath)) {
+            $tmpCmd = "$env:TEMP\mas_activate.cmd"
+            "@echo off`ncall `"$masPath`" /Z-Windows" | Out-File $tmpCmd -Encoding ASCII
+            
+            Update-Status "Ejecutando activacion..."
+            Start-Process "cmd.exe" -ArgumentList "/c", $tmpCmd -Verb RunAs -Wait
+            Update-Status "Activacion de Windows completada" "success"
+        }
+    }}
+    @{name="Activar Office"; desc="Activacion automatica de Microsoft Office"; style="primary"; action={
+        Update-Status "Preparando activacion de Office..."
+        
+        $masPath = Find-MAS
+        $scriptRoot = if ($PSScriptRoot) { $PSScriptRoot } else { $PWD.Path }
+        $downloadPath = Join-Path $scriptRoot "MAS_AIO.cmd"
+        
+        if (-not $masPath) {
+            if (-not (Download-MAS -destPath $downloadPath)) {
+                Update-Status "Error descargando MAS" "error"
+                return
+            }
+            $masPath = $downloadPath
+        }
+        
+        if ($masPath -and (Test-Path $masPath)) {
+            $tmpCmd = "$env:TEMP\mas_activate.cmd"
+            "@echo off`ncall `"$masPath`" /Z-Office" | Out-File $tmpCmd -Encoding ASCII
+            
+            Update-Status "Ejecutando activacion..."
+            Start-Process "cmd.exe" -ArgumentList "/c", $tmpCmd -Verb RunAs -Wait
+            Update-Status "Activacion de Office completada" "success"
+        }
+    }}
+    @{name="Activar Todo"; desc="Activar Windows + Office automaticamente"; style="success"; action={
+        Update-Status "Preparando activacion completa..."
+        
+        $masPath = Find-MAS
+        $scriptRoot = if ($PSScriptRoot) { $PSScriptRoot } else { $PWD.Path }
+        $downloadPath = Join-Path $scriptRoot "MAS_AIO.cmd"
+        
+        if (-not $masPath) {
+            if (-not (Download-MAS -destPath $downloadPath)) {
+                Update-Status "Error descargando MAS" "error"
+                return
+            }
+            $masPath = $downloadPath
+        }
+        
+        if ($masPath -and (Test-Path $masPath)) {
+            $tmpCmd = "$env:TEMP\mas_activate.cmd"
+            "@echo off`ncall `"$masPath`" /Z-Windows /Z-Office" | Out-File $tmpCmd -Encoding ASCII
+            
+            Update-Status "Ejecutando activacion..."
+            Start-Process "cmd.exe" -ArgumentList "/c", $tmpCmd -Verb RunAs -Wait
+            Update-Status "Activacion completa finalizada" "success"
+        }
+    }}
+    @{name="Activated.Win"; desc="Alternativa: get.activated.win"; style="warning"; action={
+        Update-Status "Abriendo activated.win..."
         try {
-            $progress = Show-ProgressDialog -title "Actualizando Script" -totalSteps 2
-            $progress.Form.Show()
-            [System.Windows.Forms.Application]::DoEvents()
-            
-            Update-ProgressDialog -dialog $progress -status "Descargando última versión..." -step 1 -percent 30
-            
-            $u = "https://github.com/WalterShadow2001/shadowiex/raw/main/Shadowiex.ps1"
-            $t = "$env:TEMP\Shadowiex.ps1"
-            Invoke-WebRequest -Uri $u -OutFile $t -UseBasicParsing
-            
-            Update-ProgressDialog -dialog $progress -status "Instalando..." -step 2 -percent 70
-            Copy-Item $t $PSCommandPath -Force
-            
-            Update-ProgressDialog -dialog $progress -status "Completado" -percent 100
-            Start-Sleep -Milliseconds 500
-            $progress.Form.Close()
-            
-            [System.Windows.Forms.MessageBox]::Show("Script actualizado correctamente.`nLa aplicación se cerrará.", "Info", 0, 64)
-            $form.Close()
+            Start-Process "powershell.exe" -ArgumentList "-NoProfile -ExecutionPolicy Bypass -Command `"irm https://get.activated.win | iex`"" -Verb RunAs
+            Update-Status "Activador abierto" "success"
         } catch {
-            [System.Windows.Forms.MessageBox]::Show("Error actualizando: $($_.Exception.Message)", "Error", 0, 16)
+            Update-Status "Error abriendo activador" "error"
         }
+    }}
+    @{name="WinUtil"; desc="Chris Titus Tech Windows Utility"; style="info"; action={
+        Update-Status "Abriendo WinUtil..."
+        try {
+            Start-Process "powershell.exe" -ArgumentList "-NoProfile -ExecutionPolicy Bypass -Command `"irm https://christitus.com/win | iex`"" -Verb RunAs
+            Update-Status "WinUtil abierto" "success"
+        } catch {
+            Update-Status "Error abriendo WinUtil" "error"
+        }
+    }}
+)
+
+$actY = 80
+$actX = 20
+$actCol = 0
+
+foreach ($btn in $activateButtons) {
+    $actPanel = New-Object System.Windows.Forms.Panel
+    $actPanel.Location = New-Object System.Drawing.Point($actX, $actY)
+    $actPanel.Size = New-Object System.Drawing.Size(280, 85)
+    $actPanel.BackColor = $theme.PanelDark
+    $script:activatePanel.Controls.Add($actPanel)
+    
+    $actBtn = New-ActionButton -text $btn.name -x 5 -y 5 -width 270 -height 40 -style $btn.style
+    $actBtn.Add_Click($btn.action)
+    $actPanel.Controls.Add($actBtn)
+    
+    $actDesc = New-Object System.Windows.Forms.Label
+    $actDesc.Text = $btn.desc
+    $actDesc.Location = New-Object System.Drawing.Point(10, 50)
+    $actDesc.Size = New-Object System.Drawing.Size(260, 30)
+    $actDesc.Font = $fontSmall
+    $actDesc.ForeColor = $theme.TextMuted
+    $actPanel.Controls.Add($actDesc)
+    
+    $actCol++
+    if ($actCol -ge 3) {
+        $actCol = 0
+        $actX = 20
+        $actY += 95
+    } else {
+        $actX += 290
     }
-    $tabSettings.Controls.Add($btnUp)
-    
-    # Información del sistema
-    $lblSys = Create-ModernLabel -text "Información del Sistema" -x 20 -y 250 -isTitle $true
-    $tabSettings.Controls.Add($lblSys)
-    
-    $osInfo = Get-CimInstance Win32_OperatingSystem
-    $tabSettings.Controls.Add((Create-ModernLabel -text "Sistema: $($osInfo.Caption)" -x 20 -y 285 -width 400))
-    $tabSettings.Controls.Add((Create-ModernLabel -text "Versión: $($osInfo.Version)" -x 20 -y 310 -width 400))
-    $tabSettings.Controls.Add((Create-ModernLabel -text "Arquitectura: $env:PROCESSOR_ARCHITECTURE" -x 20 -y 335 -width 400))
-    
-    # Créditos
-    $lblCredits = Create-ModernLabel -text "Shadowiex Professional v7.0" -x 20 -y 400 -isTitle $true
-    $lblCredits.ForeColor = $colors.Accent
-    $tabSettings.Controls.Add($lblCredits)
-    
-    $lblAuthor = Create-ModernLabel -text "Creado por WDPN (WalterShadow2001)" -x 20 -y 435 -width 300
-    $lblAuthor.ForeColor = $colors.TextSub
-    $tabSettings.Controls.Add($lblAuthor)
-    
-    $lblGitHub = Create-ModernLabel -text "GitHub: github.com/WalterShadow2001/shadowiex" -x 20 -y 460 -width 350
-    $lblGitHub.ForeColor = $colors.Info
-    $tabSettings.Controls.Add($lblGitHub)
 }
 
-# --- INICIALIZACIÓN ---
-Populate-SoftwareTab
-Populate-InstallersTab
-Populate-ActivationsTab
-Populate-SettingsTab
+# --- PANEL DE CONFIGURACION ---
+$script:configPanel = New-Object System.Windows.Forms.Panel
+$script:configPanel.Location = New-Object System.Drawing.Point(0, 0)
+$script:configPanel.Size = New-Object System.Drawing.Size(900, 635)
+$script:configPanel.BackColor = $theme.Background
+$script:configPanel.Visible = $false
+$mainContainer.Controls.Add($script:configPanel)
 
-Update-GlobalStatus "Shadowiex Professional v7.0 - Listo" $colors.Success
+$headerConfig = New-Object System.Windows.Forms.Label
+$headerConfig.Text = "CONFIGURACION"
+$headerConfig.Location = New-Object System.Drawing.Point(20, 15)
+$headerConfig.Size = New-Object System.Drawing.Size(300, 30)
+$headerConfig.Font = $fontHeader
+$headerConfig.ForeColor = $theme.Accent
+$script:configPanel.Controls.Add($headerConfig)
 
+# Estado de gestores
+$wg = Test-Winget
+$ch = Test-Chocolatey
+
+$wgLabel = New-Object System.Windows.Forms.Label
+$wgLabel.Text = "Winget: " + $(if($wg){"[INSTALADO]"}else{"[NO DISPONIBLE]"})
+$wgLabel.Location = New-Object System.Drawing.Point(20, 60)
+$wgLabel.Size = New-Object System.Drawing.Size(300, 25)
+$wgLabel.Font = $fontNormal
+$wgLabel.ForeColor = if($wg){$theme.Success}else{$theme.Error}
+$script:configPanel.Controls.Add($wgLabel)
+
+$chLabel = New-Object System.Windows.Forms.Label
+$chLabel.Text = "Chocolatey: " + $(if($ch){"[INSTALADO]"}else{"[NO DISPONIBLE]"})
+$chLabel.Location = New-Object System.Drawing.Point(20, 90)
+$chLabel.Size = New-Object System.Drawing.Size(300, 25)
+$chLabel.Font = $fontNormal
+$chLabel.ForeColor = if($ch){$theme.Success}else{$theme.Error}
+$script:configPanel.Controls.Add($chLabel)
+
+if (-not $wg) {
+    $instWgBtn = New-ActionButton -text "Instalar Winget" -x 350 -y 55 -width 150 -style "info"
+    $instWgBtn.Add_Click({
+        Update-Status "Instalando Winget..."
+        try {
+            $uri = "https://github.com/microsoft/winget-cli/releases/latest/download/Microsoft.DesktopAppInstaller_8wekyb3d8bbwe.msixbundle"
+            $out = "$env:TEMP\Winget.msixbundle"
+            Invoke-WebRequest -Uri $uri -OutFile $out -UseBasicParsing
+            Add-AppxPackage -Path $out
+            Update-Status "Winget instalado correctamente" "success"
+        } catch {
+            Update-Status "Error instalando Winget" "error"
+        }
+    })
+    $script:configPanel.Controls.Add($instWgBtn)
+}
+
+if (-not $ch) {
+    $instChBtn = New-ActionButton -text "Instalar Chocolatey" -x 350 -y 85 -width 150 -style "info"
+    $instChBtn.Add_Click({
+        Update-Status "Instalando Chocolatey..."
+        try {
+            Set-ExecutionPolicy Bypass -Scope Process -Force
+            [System.Net.ServicePointManager]::SecurityProtocol = 3072
+            Invoke-Expression ((New-Object System.Net.WebClient).DownloadString('https://community.chocolatey.org/install.ps1'))
+            Update-Status "Chocolatey instalado correctamente" "success"
+        } catch {
+            Update-Status "Error instalando Chocolatey" "error"
+        }
+    })
+    $script:configPanel.Controls.Add($instChBtn)
+}
+
+# Informacion del sistema
+$sysInfoLabel = New-Object System.Windows.Forms.Label
+$sysInfoLabel.Text = "INFORMACION DEL SISTEMA"
+$sysInfoLabel.Location = New-Object System.Drawing.Point(20, 140)
+$sysInfoLabel.Size = New-Object System.Drawing.Size(300, 25)
+$sysInfoLabel.Font = $fontSubHeader
+$sysInfoLabel.ForeColor = $theme.Category
+$script:configPanel.Controls.Add($sysInfoLabel)
+
+$osInfo = Get-CimInstance Win32_OperatingSystem
+$sysLabels = @(
+    "Sistema: $($osInfo.Caption)",
+    "Version: $($osInfo.Version)",
+    "Arquitectura: $env:PROCESSOR_ARCHITECTURE",
+    "Usuario: $env:USERNAME",
+    "Equipo: $env:COMPUTERNAME"
+)
+
+$sysY = 175
+foreach ($info in $sysLabels) {
+    $lbl = New-Object System.Windows.Forms.Label
+    $lbl.Text = $info
+    $lbl.Location = New-Object System.Drawing.Point(20, $sysY)
+    $lbl.Size = New-Object System.Drawing.Size(500, 20)
+    $lbl.Font = $fontNormal
+    $lbl.ForeColor = $theme.TextSecondary
+    $script:configPanel.Controls.Add($lbl)
+    $sysY += 25
+}
+
+# Creditos
+$creditsLabel = New-Object System.Windows.Forms.Label
+$creditsLabel.Text = "Shadowiex v8.0 - WinUtil Style Edition"
+$creditsLabel.Location = New-Object System.Drawing.Point(20, 350)
+$creditsLabel.Size = New-Object System.Drawing.Size(400, 25)
+$creditsLabel.Font = $fontSubHeader
+$creditsLabel.ForeColor = $theme.Accent
+$script:configPanel.Controls.Add($creditsLabel)
+
+$authorLabel = New-Object System.Windows.Forms.Label
+$authorLabel.Text = "Creado por WDPN | github.com/WalterShadow2001"
+$authorLabel.Location = New-Object System.Drawing.Point(20, 380)
+$authorLabel.Size = New-Object System.Drawing.Size(400, 20)
+$authorLabel.Font = $fontSmall
+$authorLabel.ForeColor = $theme.TextMuted
+$script:configPanel.Controls.Add($authorLabel)
+
+# --- NAVEGACION ---
+$script:activeNav = "Instalar"
+$script:installPanel.Visible = $true
+
+foreach ($navBtn in $navButtons) {
+    $navBtn.Add_Click({
+        $script:activeNav = $this.Tag
+        
+        # Resetear colores
+        foreach ($n in $navButtons) {
+            $n.BackColor = $theme.PanelLight
+        }
+        $this.BackColor = $theme.Accent
+        
+        # Mostrar panel correspondiente
+        $script:installPanel.Visible = ($this.Tag -eq "Instalar")
+        $script:tweaksPanel.Visible = ($this.Tag -eq "Tweaks")
+        $script:activatePanel.Visible = ($this.Tag -eq "Activar")
+        $script:configPanel.Visible = ($this.Tag -eq "Config")
+        
+        Update-Status "Panel: $($this.Tag)"
+    })
+}
+
+# Activar primer boton
+$navButtons[0].BackColor = $theme.Accent
+
+# Mostrar formulario
+Update-Status "Listo - Shadowiex v8.0 WinUtil Style"
 [void]$form.ShowDialog()
