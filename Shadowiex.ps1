@@ -1,6 +1,6 @@
 <#
 .SYNOPSIS
-    SHADOWIEX v14.5 - Professional PC Toolkit
+    SHADOWIEX v15.0 - Professional PC Toolkit
 .DESCRIPTION
     Herramienta profesional de diagnostico, reparacion, instalacion y activacion.
     Integracion completa con MAS (iex online + offline).
@@ -39,7 +39,7 @@ foreach ($line in $SplashLines) {
     Write-Host $line -ForegroundColor White
 }
 Write-Host ""
-Write-Host "                       Professional PC Toolkit  v14.5" -ForegroundColor Gray
+Write-Host "                       Professional PC Toolkit  v15.0" -ForegroundColor Gray
 Write-Host ""
 
 $LoadSteps = @(
@@ -88,23 +88,23 @@ Add-Type -AssemblyName System.Windows.Forms
 #  TEMA SHADOWIEX - FORMAL DARK
 # ============================================================================
 $Global:Theme = @{
-    BG           = [System.Drawing.Color]::FromArgb(20, 20, 25)
-    Surface      = [System.Drawing.Color]::FromArgb(30, 30, 38)
-    SurfaceLight = [System.Drawing.Color]::FromArgb(42, 42, 52)
-    SurfaceHover = [System.Drawing.Color]::FromArgb(52, 52, 64)
-    Primary      = [System.Drawing.Color]::FromArgb(100, 110, 140)
-    PrimaryHover = [System.Drawing.Color]::FromArgb(120, 130, 160)
-    Secondary    = [System.Drawing.Color]::FromArgb(80, 100, 120)
-    Accent       = [System.Drawing.Color]::FromArgb(160, 130, 180)
-    Success      = [System.Drawing.Color]::FromArgb(76, 140, 100)
-    Warning      = [System.Drawing.Color]::FromArgb(170, 140, 70)
-    Danger       = [System.Drawing.Color]::FromArgb(160, 80, 80)
-    Info         = [System.Drawing.Color]::FromArgb(80, 120, 160)
-    TextMain     = [System.Drawing.Color]::FromArgb(210, 215, 225)
-    TextMuted    = [System.Drawing.Color]::FromArgb(130, 135, 150)
-    TextDim      = [System.Drawing.Color]::FromArgb(90, 95, 110)
-    Border       = [System.Drawing.Color]::FromArgb(50, 55, 65)
-    Highlight    = [System.Drawing.Color]::FromArgb(180, 185, 200)
+    BG           = [System.Drawing.Color]::FromArgb(8, 8, 12)
+    Surface      = [System.Drawing.Color]::FromArgb(16, 16, 22)
+    SurfaceLight = [System.Drawing.Color]::FromArgb(24, 24, 32)
+    SurfaceHover = [System.Drawing.Color]::FromArgb(34, 34, 44)
+    Primary      = [System.Drawing.Color]::FromArgb(59, 130, 246)
+    PrimaryHover = [System.Drawing.Color]::FromArgb(96, 165, 250)
+    Secondary    = [System.Drawing.Color]::FromArgb(30, 41, 59)
+    Accent       = [System.Drawing.Color]::FromArgb(37, 99, 235)
+    Success      = [System.Drawing.Color]::FromArgb(96, 165, 250)
+    Warning      = [System.Drawing.Color]::FromArgb(148, 163, 184)
+    Danger       = [System.Drawing.Color]::FromArgb(203, 213, 225)
+    Info         = [System.Drawing.Color]::FromArgb(59, 130, 246)
+    TextMain     = [System.Drawing.Color]::FromArgb(241, 245, 249)
+    TextMuted    = [System.Drawing.Color]::FromArgb(148, 163, 184)
+    TextDim      = [System.Drawing.Color]::FromArgb(71, 85, 105)
+    Border       = [System.Drawing.Color]::FromArgb(30, 41, 59)
+    Highlight    = [System.Drawing.Color]::FromArgb(248, 250, 252)
 }
 
 $Global:Fonts = @{
@@ -156,8 +156,8 @@ if (Test-Path $localLogo) {
 $Global:ToolTip = New-Object System.Windows.Forms.ToolTip
 $Global:ToolTip.InitialDelay = 300
 $Global:ToolTip.ReshowDelay = 100
-$Global:ToolTip.BackColor = [System.Drawing.Color]::FromArgb(45, 45, 55)
-$Global:ToolTip.ForeColor = [System.Drawing.Color]::FromArgb(210, 215, 225)
+$Global:ToolTip.BackColor = [System.Drawing.Color]::FromArgb(16, 16, 22)
+$Global:ToolTip.ForeColor = [System.Drawing.Color]::FromArgb(241, 245, 249)
 $Global:ToolTip.IsBalloon = $false
 
 function Write-Log {
@@ -237,33 +237,17 @@ function New-Btn {
         [string]$Color = "Primary", [scriptblock]$Action = $null,
         [string]$Tooltip = ""
     )
-    $BtnColor = switch ($Color) {
-        "Success"   { $Global:Theme.Success }
-        "Danger"    { $Global:Theme.Danger }
-        "Warning"   { $Global:Theme.Warning }
-        "Secondary" { $Global:Theme.Secondary }
-        "Accent"    { $Global:Theme.Accent }
-        "Info"      { $Global:Theme.Info }
-        "Highlight" { $Global:Theme.Highlight }
-        default     { $Global:Theme.Primary }
-    }
-    $HoverColor = switch ($Color) {
-        "Success"   { [System.Drawing.Color]::FromArgb(90, 160, 115) }
-        "Danger"    { [System.Drawing.Color]::FromArgb(180, 100, 100) }
-        "Warning"   { [System.Drawing.Color]::FromArgb(190, 160, 90) }
-        default     { $Global:Theme.PrimaryHover }
-    }
     $Btn = New-Object System.Windows.Forms.Button
     $Btn.Text = $Text
     $Btn.Location = New-Object System.Drawing.Point($X, $Y)
     $Btn.Size = New-Object System.Drawing.Size($W, $H)
-    $Btn.BackColor = $BtnColor
+    $Btn.BackColor = $Global:Theme.Primary
     $Btn.ForeColor = [System.Drawing.Color]::White
     $Btn.FlatStyle = [System.Windows.Forms.FlatStyle]::Flat
     $Btn.Font = $Global:Fonts.Button
     $Btn.Cursor = [System.Windows.Forms.Cursors]::Hand
     $Btn.FlatAppearance.BorderSize = 0
-    $Btn.FlatAppearance.MouseOverBackColor = $HoverColor
+    $Btn.FlatAppearance.MouseOverBackColor = $Global:Theme.PrimaryHover
     if ($Tooltip -ne "") { $Global:ToolTip.SetToolTip($Btn, $Tooltip) }
     if ($Action) { $Btn.Add_Click($Action) }
     return $Btn
@@ -353,7 +337,7 @@ function Test-ChocoDir { Test-Path 'C:\ProgramData\chocolatey' }
 #  FORMULARIO PRINCIPAL
 # ============================================================================
 $Global:Form = New-Object System.Windows.Forms.Form
-$Global:Form.Text = "SHADOWIEX v14.2"
+$Global:Form.Text = "SHADOWIEX v15.0"
 $Global:Form.Size = New-Object System.Drawing.Size(1100, 750)
 $Global:Form.StartPosition = "CenterScreen"
 $Global:Form.BackColor = $Global:Theme.BG
@@ -396,7 +380,7 @@ $TitleLabel.ForeColor = $Global:Theme.Highlight
 $HeaderPanel.Controls.Add($TitleLabel)
 
 $VersionLabel = New-Object System.Windows.Forms.Label
-$VersionLabel.Text = "v14.2 Professional"
+$VersionLabel.Text = "v15.0 Professional"
 $VersionLabel.Location = New-Object System.Drawing.Point(230, 25)
 $VersionLabel.Size = New-Object System.Drawing.Size(130, 18)
 $VersionLabel.Font = $Global:Fonts.Small
@@ -785,11 +769,17 @@ if (-not $HasW) {
     $InstWBtn.Add_Click({
         Update-Status "Instalando winget..."
         try {
-            Start-Process "powershell" -ArgumentList "-NoProfile -ExecutionPolicy Bypass -Command `"`$progressPreference='silently'; Invoke-WebRequest -Uri https://aka.ms/getwinget -OutFile `$env:TEMP\Microsoft.DesktopAppInstaller.msixbundle; Add-AppxPackage -Path `$env:TEMP\Microsoft.DesktopAppInstaller.msixbundle`"" -Verb RunAs -Wait
-                Update-Status "winget instalado - reinicia SHADOWIEX" "success"
-                Write-Log "winget instalado"
-            } catch { Update-Status "Error instalando winget" "error" }
-        })
+            $WingetScript = @'
+$progressPreference = 'silently'
+Invoke-WebRequest -Uri https://aka.ms/getwinget -OutFile $env:TEMP\Microsoft.DesktopAppInstaller.msixbundle
+Add-AppxPackage -Path $env:TEMP\Microsoft.DesktopAppInstaller.msixbundle
+'@
+            $WingetScript | Out-File (Join-Path $env:TEMP "SHADOWIEX_Winget.ps1") -Force
+            Start-Process powershell -ArgumentList "-NoProfile -ExecutionPolicy Bypass -File `"$env:TEMP\SHADOWIEX_Winget.ps1`"" -Verb RunAs -Wait
+            Update-Status "winget instalado - reinicia SHADOWIEX" "success"
+            Write-Log "winget instalado"
+        } catch { Update-Status "Error instalando winget" "error" }
+    })
     $WCard.Controls.Add($InstWBtn)
 }
 $WCard.Controls.Add((New-DescLabel -Text "Gestor de paquetes de Microsoft" -X 10 -Y 28 -W 235 -H 16))
@@ -818,14 +808,27 @@ if (-not $HasC) {
         if ($CIsBroken) {
             Update-Status "Reparando Chocolatey..."
             try {
-                Start-Process "powershell" -ArgumentList "-NoProfile -ExecutionPolicy Bypass -Command `"Remove-Item -Recurse -Force 'C:\ProgramData\chocolatey'; Set-ExecutionPolicy Bypass -Scope Process -Force; [System.Net.ServicePointManager]::SecurityProtocol = 3072; Invoke-Expression ((New-Object System.Net.WebClient).DownloadString('https://community.chocolatey.org/install.ps1'))`"" -Verb RunAs -Wait
+                $ChocoScript = @'
+if (Test-Path 'C:\ProgramData\chocolatey') { Remove-Item -Recurse -Force 'C:\ProgramData\chocolatey' }
+Set-ExecutionPolicy Bypass -Scope Process -Force
+[System.Net.ServicePointManager]::SecurityProtocol = 3072
+Invoke-Expression ((New-Object System.Net.WebClient).DownloadString('https://community.chocolatey.org/install.ps1'))
+'@
+                $ChocoScript | Out-File (Join-Path $env:TEMP "SHADOWIEX_Choco.ps1") -Force
+                Start-Process powershell -ArgumentList "-NoProfile -ExecutionPolicy Bypass -File `"$env:TEMP\SHADOWIEX_Choco.ps1`"" -Verb RunAs -Wait
                 Update-Status "Chocolatey reparado - reinicia SHADOWIEX" "success"
                 Write-Log "Chocolatey reparado"
             } catch { Update-Status "Error reparando Chocolatey" "error" }
         } else {
             Update-Status "Instalando Chocolatey..."
             try {
-                Start-Process "powershell" -ArgumentList "-NoProfile -ExecutionPolicy Bypass -Command `"Set-ExecutionPolicy Bypass -Scope Process -Force; [System.Net.ServicePointManager]::SecurityProtocol = 3072; Invoke-Expression ((New-Object System.Net.WebClient).DownloadString('https://community.chocolatey.org/install.ps1'))`"" -Verb RunAs -Wait
+                $ChocoScript = @'
+Set-ExecutionPolicy Bypass -Scope Process -Force
+[System.Net.ServicePointManager]::SecurityProtocol = 3072
+Invoke-Expression ((New-Object System.Net.WebClient).DownloadString('https://community.chocolatey.org/install.ps1'))
+'@
+                $ChocoScript | Out-File (Join-Path $env:TEMP "SHADOWIEX_Choco.ps1") -Force
+                Start-Process powershell -ArgumentList "-NoProfile -ExecutionPolicy Bypass -File `"$env:TEMP\SHADOWIEX_Choco.ps1`"" -Verb RunAs -Wait
                 Update-Status "Chocolatey instalado - reinicia SHADOWIEX" "success"
                 Write-Log "Chocolatey instalado"
             } catch { Update-Status "Error instalando Chocolatey" "error" }
@@ -1443,12 +1446,6 @@ $toolsY += 26
 $masVal = if($masFound){"Encontrado"}else{"No encontrado"}
 $masClr = if($masFound){$Global:Theme.Success}else{$Global:Theme.Warning}
 Add-InfoRow -Parent $ConfigScroll -Label "MAS_AIO.cmd:" -Value $masVal -X 20 -Y $toolsY -ValueColor $masClr
-$toolsY += 26
-$instCount = 0
-if (Test-Path $Global:InstaladoresDir) { $instCount = (Get-ChildItem -Path $Global:InstaladoresDir -Filter "*.exe" -EA 0 | Measure-Object).Count }
-$instVal = "$instCount archivos .exe"
-$instClr = if($instCount -gt 0){$Global:Theme.Success}else{$Global:Theme.Warning}
-Add-InfoRow -Parent $ConfigScroll -Label "Instaladores:" -Value $instVal -X 20 -Y $toolsY -ValueColor $instClr
 $toolsY += 36
 
 $ConfigScroll.Controls.Add((New-SectionTitle -Text "INFORMACION DEL SISTEMA" -X 15 -Y $toolsY))
@@ -1502,7 +1499,7 @@ $CreditPanel.Location = New-Object System.Drawing.Point(15, $toolsY)
 $CreditPanel.Size = New-Object System.Drawing.Size(500, 70)
 $CreditPanel.BackColor = $Global:Theme.Surface
 $ConfigScroll.Controls.Add($CreditPanel)
-$CreditPanel.Controls.Add((New-Object System.Windows.Forms.Label -Property @{Text = "SHADOWIEX v14.1 Professional PC Toolkit"; Location = New-Object System.Drawing.Point(15, 10); Size = New-Object System.Drawing.Size(470, 20); Font = $Global:Fonts.Header; ForeColor = $Global:Theme.TextDim}))
+$CreditPanel.Controls.Add((New-Object System.Windows.Forms.Label -Property @{Text = "SHADOWIEX v15.0 Professional PC Toolkit"; Location = New-Object System.Drawing.Point(15, 10); Size = New-Object System.Drawing.Size(470, 20); Font = $Global:Fonts.Header; ForeColor = $Global:Theme.TextDim}))
 $CreditPanel.Controls.Add((New-Object System.Windows.Forms.Label -Property @{Text = "Creado por WDPN (WalterShadow2001)"; Location = New-Object System.Drawing.Point(15, 32); Size = New-Object System.Drawing.Size(470, 16); Font = $Global:Fonts.Small; ForeColor = $Global:Theme.TextMuted}))
 $CreditPanel.Controls.Add((New-Object System.Windows.Forms.Label -Property @{Text = "github.com/WalterShadow2001/shadowiex"; Location = New-Object System.Drawing.Point(15, 50); Size = New-Object System.Drawing.Size(470, 16); Font = $Global:Fonts.Small; ForeColor = $Global:Theme.TextDim}))
 
@@ -1535,15 +1532,11 @@ $MASStatusBar = New-Object System.Windows.Forms.ToolStripStatusLabel
 $MASStatusBar.Text = "  MAS: $(if($masFound){'OK'}else{'--'})"; $MASStatusBar.ForeColor = if($masFound){$Global:Theme.Success}else{$Global:Theme.Warning}
 $StatusStrip.Items.Add($MASStatusBar)
 
-$InstStatus = New-Object System.Windows.Forms.ToolStripStatusLabel
-$InstStatus.Text = "  Instaladores: $instCount"; $InstStatus.ForeColor = if($instCount -gt 0){$Global:Theme.Success}else{$Global:Theme.TextDim}
-$StatusStrip.Items.Add($InstStatus)
-
 $Global:Form.Controls.Add($StatusStrip)
 
 # ============================================================================
 #  INICIAR
 # ============================================================================
-Write-Log "SHADOWIEX v14.1 iniciado"
-Update-Status "SHADOWIEX v14.1 Professional - Listo"
+Write-Log "SHADOWIEX v15.0 iniciado"
+Update-Status "SHADOWIEX v15.0 Professional - Listo"
 [void]$Global:Form.ShowDialog()
