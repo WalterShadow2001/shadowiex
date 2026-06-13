@@ -88,23 +88,23 @@ Add-Type -AssemblyName System.Windows.Forms
 #  TEMA SHADOWIEX - FORMAL DARK
 # ============================================================================
 $Global:Theme = @{
-    BG           = [System.Drawing.Color]::FromArgb(8, 8, 12)
-    Surface      = [System.Drawing.Color]::FromArgb(16, 16, 22)
-    SurfaceLight = [System.Drawing.Color]::FromArgb(24, 24, 32)
-    SurfaceHover = [System.Drawing.Color]::FromArgb(34, 34, 44)
-    Primary      = [System.Drawing.Color]::FromArgb(59, 130, 246)
-    PrimaryHover = [System.Drawing.Color]::FromArgb(96, 165, 250)
-    Secondary    = [System.Drawing.Color]::FromArgb(30, 41, 59)
-    Accent       = [System.Drawing.Color]::FromArgb(37, 99, 235)
+    BG           = [System.Drawing.Color]::FromArgb(30, 30, 30)
+    Surface      = [System.Drawing.Color]::FromArgb(37, 37, 37)
+    SurfaceLight = [System.Drawing.Color]::FromArgb(45, 50, 58)
+    SurfaceHover = [System.Drawing.Color]::FromArgb(55, 62, 72)
+    Primary      = [System.Drawing.Color]::FromArgb(55, 65, 81)
+    PrimaryHover = [System.Drawing.Color]::FromArgb(71, 85, 105)
+    Secondary    = [System.Drawing.Color]::FromArgb(45, 55, 72)
+    Accent       = [System.Drawing.Color]::FromArgb(59, 130, 246)
     Success      = [System.Drawing.Color]::FromArgb(96, 165, 250)
     Warning      = [System.Drawing.Color]::FromArgb(148, 163, 184)
     Danger       = [System.Drawing.Color]::FromArgb(203, 213, 225)
     Info         = [System.Drawing.Color]::FromArgb(59, 130, 246)
     TextMain     = [System.Drawing.Color]::FromArgb(241, 245, 249)
-    TextMuted    = [System.Drawing.Color]::FromArgb(148, 163, 184)
-    TextDim      = [System.Drawing.Color]::FromArgb(71, 85, 105)
-    Border       = [System.Drawing.Color]::FromArgb(30, 41, 59)
-    Highlight    = [System.Drawing.Color]::FromArgb(248, 250, 252)
+    TextMuted    = [System.Drawing.Color]::FromArgb(156, 163, 175)
+    TextDim      = [System.Drawing.Color]::FromArgb(100, 106, 115)
+    Border       = [System.Drawing.Color]::FromArgb(45, 50, 60)
+    Highlight    = [System.Drawing.Color]::FromArgb(96, 165, 250)
 }
 
 $Global:Fonts = @{
@@ -231,6 +231,20 @@ function Invoke-MAS_iex {
 # ============================================================================
 #  COMPONENTES DE UI
 # ============================================================================
+
+# Helper: aplicar bordes redondeados a un control
+function Set-RoundedRegion {
+    param($Control, [int]$Radius = 8)
+    $W = $Control.Width; $H = $Control.Height; $R = $Radius
+    $path = New-Object System.Drawing.Drawing2D.GraphicsPath
+    $path.AddArc(0, 0, $R, $R, 180, 90)
+    $path.AddArc($W - $R, 0, $R, $R, 270, 90)
+    $path.AddArc($W - $R, $H - $R, $R, $R, 0, 90)
+    $path.AddArc(0, $H - $R, $R, $R, 90, 90)
+    $path.CloseFigure()
+    $Control.Region = New-Object System.Drawing.Region($path)
+}
+
 function New-Btn {
     param(
         [string]$Text, [int]$X, [int]$Y, [int]$W = 200, [int]$H = 38,
@@ -250,6 +264,7 @@ function New-Btn {
     $Btn.FlatAppearance.MouseOverBackColor = $Global:Theme.PrimaryHover
     if ($Tooltip -ne "") { $Global:ToolTip.SetToolTip($Btn, $Tooltip) }
     if ($Action) { $Btn.Add_Click($Action) }
+    Set-RoundedRegion -Control $Btn -Radius 6
     return $Btn
 }
 
@@ -259,6 +274,7 @@ function New-Card {
     $Card.Location = New-Object System.Drawing.Point($X, $Y)
     $Card.Size = New-Object System.Drawing.Size($W, $H)
     $Card.BackColor = $Global:Theme.Surface
+    Set-RoundedRegion -Control $Card -Radius 8
     return $Card
 }
 
@@ -354,7 +370,7 @@ try {
 # ============================================================================
 $HeaderPanel = New-Object System.Windows.Forms.Panel
 $HeaderPanel.Dock = [System.Windows.Forms.DockStyle]::Top
-$HeaderPanel.Height = 60
+$HeaderPanel.Height = 55
 $HeaderPanel.BackColor = $Global:Theme.Surface
 $Global:Form.Controls.Add($HeaderPanel)
 
@@ -376,7 +392,7 @@ $TitleLabel.Text = "SHADOWIEX"
 $TitleLabel.Location = New-Object System.Drawing.Point(62, 12)
 $TitleLabel.Size = New-Object System.Drawing.Size(180, 36)
 $TitleLabel.Font = $Global:Fonts.Title
-$TitleLabel.ForeColor = $Global:Theme.Highlight
+$TitleLabel.ForeColor = $Global:Theme.TextMain
 $HeaderPanel.Controls.Add($TitleLabel)
 
 $VersionLabel = New-Object System.Windows.Forms.Label
@@ -406,30 +422,24 @@ $AdminLabel.ForeColor = $Global:Theme.Success
 $AdminLabel.TextAlign = [System.Drawing.ContentAlignment]::TopRight
 $HeaderPanel.Controls.Add($AdminLabel)
 
-$AccentLine = New-Object System.Windows.Forms.Panel
-$AccentLine.Dock = [System.Windows.Forms.DockStyle]::Bottom
-$AccentLine.Height = 1
-$AccentLine.BackColor = $Global:Theme.Border
-$HeaderPanel.Controls.Add($AccentLine)
-
 # ============================================================================
 #  PANEL DE PESTANAS
 # ============================================================================
 $TabControl = New-Object System.Windows.Forms.TabControl
-$TabControl.Location = New-Object System.Drawing.Point(0, 60)
-$TabControl.Size = New-Object System.Drawing.Size(1100, 640)
+$TabControl.Location = New-Object System.Drawing.Point(0, 55)
+$TabControl.Size = New-Object System.Drawing.Size(1100, 645)
 $TabControl.BackColor = $Global:Theme.BG
 $TabControl.Appearance = [System.Windows.Forms.TabAppearance]::FlatButtons
-$TabControl.ItemSize = New-Object System.Drawing.Size(110, 30)
+$TabControl.ItemSize = New-Object System.Drawing.Size(120, 32)
 $TabControl.Font = $Global:Fonts.Button
-$TabControl.Padding = New-Object System.Drawing.Point(8, 2)
+$TabControl.Padding = New-Object System.Drawing.Point(10, 4)
 
-$TabDiag    = New-Object System.Windows.Forms.TabPage; $TabDiag.Text = "DIAGNOSTICO";  $TabDiag.BackColor = $Global:Theme.BG; $TabDiag.Padding = New-Object System.Windows.Forms.Padding(15)
-$TabRepair  = New-Object System.Windows.Forms.TabPage; $TabRepair.Text = "REPARAR";     $TabRepair.BackColor = $Global:Theme.BG; $TabRepair.Padding = New-Object System.Windows.Forms.Padding(15)
-$TabInstall = New-Object System.Windows.Forms.TabPage; $TabInstall.Text = "INSTALAR";    $TabInstall.BackColor = $Global:Theme.BG; $TabInstall.Padding = New-Object System.Windows.Forms.Padding(15)
-$TabAct     = New-Object System.Windows.Forms.TabPage; $TabAct.Text = "ACTIVAR";      $TabAct.BackColor = $Global:Theme.BG; $TabAct.Padding = New-Object System.Windows.Forms.Padding(15)
-$TabTweaks  = New-Object System.Windows.Forms.TabPage; $TabTweaks.Text = "OPTIMIZAR";   $TabTweaks.BackColor = $Global:Theme.BG; $TabTweaks.Padding = New-Object System.Windows.Forms.Padding(15)
-$TabConfig  = New-Object System.Windows.Forms.TabPage; $TabConfig.Text = "CONFIG";       $TabConfig.BackColor = $Global:Theme.BG; $TabConfig.Padding = New-Object System.Windows.Forms.Padding(15)
+$TabDiag    = New-Object System.Windows.Forms.TabPage; $TabDiag.Text = "DIAGNOSTICO";  $TabDiag.BackColor = $Global:Theme.BG; $TabDiag.Padding = New-Object System.Windows.Forms.Padding(20)
+$TabRepair  = New-Object System.Windows.Forms.TabPage; $TabRepair.Text = "REPARAR";     $TabRepair.BackColor = $Global:Theme.BG; $TabRepair.Padding = New-Object System.Windows.Forms.Padding(20)
+$TabInstall = New-Object System.Windows.Forms.TabPage; $TabInstall.Text = "INSTALAR";    $TabInstall.BackColor = $Global:Theme.BG; $TabInstall.Padding = New-Object System.Windows.Forms.Padding(20)
+$TabAct     = New-Object System.Windows.Forms.TabPage; $TabAct.Text = "ACTIVAR";      $TabAct.BackColor = $Global:Theme.BG; $TabAct.Padding = New-Object System.Windows.Forms.Padding(20)
+$TabTweaks  = New-Object System.Windows.Forms.TabPage; $TabTweaks.Text = "OPTIMIZAR";   $TabTweaks.BackColor = $Global:Theme.BG; $TabTweaks.Padding = New-Object System.Windows.Forms.Padding(20)
+$TabConfig  = New-Object System.Windows.Forms.TabPage; $TabConfig.Text = "CONFIG";       $TabConfig.BackColor = $Global:Theme.BG; $TabConfig.Padding = New-Object System.Windows.Forms.Padding(20)
 
 $TabControl.Controls.AddRange(@($TabDiag, $TabRepair, $TabInstall, $TabAct, $TabTweaks, $TabConfig))
 $Global:Form.Controls.Add($TabControl)
@@ -635,7 +645,7 @@ $DiagScroll.Controls.Add($btnCopyDiag)
 
 # Quick info cards
 $DiagY = 65
-$cardW = 248; $cardH = 70; $cardGap = 8
+$cardW = 258; $cardH = 75; $cardGap = 10
 
 # CPU Card
 $CardCPU = New-Card -X 15 -Y $DiagY -W $cardW -H $cardH
@@ -794,13 +804,13 @@ $TabInstall.Controls.Add($InstallLeftPanel)
 $InstallLeftPanel.Controls.Add((New-SectionTitle -Text "GESTOR DE PAQUETES" -X 10 -Y 5 -W 300))
 
 # --- Estado de winget y choco con botones de instalacion ---
-$PkgY = 30
+$PkgY = 35
 $HasW = Test-Winget; $HasC = Test-Choco; $HasCDir = Test-ChocoDir
 
 # Winget status card
 $WCard = New-Object System.Windows.Forms.Panel
 $WCard.Location = New-Object System.Drawing.Point(10, $PkgY)
-$WCard.Size = New-Object System.Drawing.Size(255, 52)
+$WCard.Size = New-Object System.Drawing.Size(260, 55)
 $WCard.BackColor = $Global:Theme.SurfaceLight
 $InstallLeftPanel.Controls.Add($WCard)
 $WCard.Controls.Add((New-Object System.Windows.Forms.Label -Property @{
@@ -836,8 +846,8 @@ $WCard.Controls.Add((New-DescLabel -Text "Gestor de paquetes de Microsoft" -X 10
 
 # Choco status card
 $CCard = New-Object System.Windows.Forms.Panel
-$CCard.Location = New-Object System.Drawing.Point(275, $PkgY)
-$CCard.Size = New-Object System.Drawing.Size(270, 52)
+$CCard.Location = New-Object System.Drawing.Point(280, $PkgY)
+$CCard.Size = New-Object System.Drawing.Size(265, 55)
 $CCard.BackColor = $Global:Theme.SurfaceLight
 $InstallLeftPanel.Controls.Add($CCard)
 $CCard.Controls.Add((New-Object System.Windows.Forms.Label -Property @{
@@ -1217,8 +1227,9 @@ foreach ($Ver in $OfficeDownloads.Keys) {
     # Version header
     $VerPanel = New-Object System.Windows.Forms.Panel
     $VerPanel.Location = New-Object System.Drawing.Point(15, $DlY)
-    $VerPanel.Size = New-Object System.Drawing.Size(470, 20)
+    $VerPanel.Size = New-Object System.Drawing.Size(470, 22)
     $VerPanel.BackColor = $Global:Theme.Surface
+    Set-RoundedRegion -Control $VerPanel -Radius 6
     $InstallRightPanel.Controls.Add($VerPanel)
     $VerPanel.Controls.Add((New-Object System.Windows.Forms.Label -Property @{
         Text = "  $Ver"; Location = New-Object System.Drawing.Point(2, 1)
@@ -1229,8 +1240,9 @@ foreach ($Ver in $OfficeDownloads.Keys) {
     foreach ($Item in $OfficeDownloads[$Ver]) {
         $Card = New-Object System.Windows.Forms.Panel
         $Card.Location = New-Object System.Drawing.Point(15, $DlY)
-        $Card.Size = New-Object System.Drawing.Size(470, 34)
+        $Card.Size = New-Object System.Drawing.Size(470, 36)
         $Card.BackColor = $Global:Theme.SurfaceLight
+        Set-RoundedRegion -Control $Card -Radius 6
         $InstallRightPanel.Controls.Add($Card)
 
         $Card.Controls.Add((New-Object System.Windows.Forms.Label -Property @{
@@ -1280,8 +1292,9 @@ $DlY += 24
 
 $OptCard = New-Object System.Windows.Forms.Panel
 $OptCard.Location = New-Object System.Drawing.Point(15, $DlY)
-$OptCard.Size = New-Object System.Drawing.Size(470, 40)
+$OptCard.Size = New-Object System.Drawing.Size(470, 42)
 $OptCard.BackColor = $Global:Theme.SurfaceLight
+Set-RoundedRegion -Control $OptCard -Radius 6
 $InstallRightPanel.Controls.Add($OptCard)
 $OptCard.Controls.Add((New-Object System.Windows.Forms.Label -Property @{
     Text = "Optimizer v16.7 (github.com/hellzerg)"; Location = New-Object System.Drawing.Point(10, 3)
