@@ -123,10 +123,15 @@ if (-not $Global:ScriptDir) { $Global:ScriptDir = (Get-Location).Path }
 $Global:InstaladoresDir = Join-Path $Global:ScriptDir "instaladores"
 $Global:LogFile = Join-Path $env:TEMP "SHADOWIEX_log.txt"
 
-# Descargar logo PNG desde GitHub si no existe localmente (cache en TEMP)
+# Descargar logo PNG e ICO desde GitHub si no existen localmente (cache en TEMP)
 $Global:LogoPath = $null
+$Global:IconPath = $null
 $localLogo = Join-Path $Global:ScriptDir "SHADOWIEX_LOGO.png"
 $cachedLogo = Join-Path $env:TEMP "SHADOWIEX_LOGO.png"
+$localIco = Join-Path $Global:ScriptDir "SHADOWIEX_LOGO.ico"
+$cachedIco = Join-Path $env:TEMP "SHADOWIEX_LOGO.ico"
+
+# Logo PNG
 if (Test-Path $localLogo) {
     $Global:LogoPath = $localLogo
 } elseif (Test-Path $cachedLogo) {
@@ -134,9 +139,21 @@ if (Test-Path $localLogo) {
 } else {
     try {
         [Net.ServicePointManager]::SecurityProtocol = 3072
-        $logoUrl = "https://raw.githubusercontent.com/WalterShadow2001/shadowiex/main/SHADOWIEX_LOGO.png"
-        (New-Object System.Net.WebClient).DownloadFile($logoUrl, $cachedLogo)
+        (New-Object System.Net.WebClient).DownloadFile("https://raw.githubusercontent.com/WalterShadow2001/shadowiex/main/SHADOWIEX_LOGO.png", $cachedLogo)
         if (Test-Path $cachedLogo) { $Global:LogoPath = $cachedLogo }
+    } catch {}
+}
+
+# Icono ICO
+if (Test-Path $localIco) {
+    $Global:IconPath = $localIco
+} elseif (Test-Path $cachedIco) {
+    $Global:IconPath = $cachedIco
+} else {
+    try {
+        [Net.ServicePointManager]::SecurityProtocol = 3072
+        (New-Object System.Net.WebClient).DownloadFile("https://raw.githubusercontent.com/WalterShadow2001/shadowiex/main/SHADOWIEX_LOGO.ico", $cachedIco)
+        if (Test-Path $cachedIco) { $Global:IconPath = $cachedIco }
     } catch {}
 }
 
@@ -347,8 +364,9 @@ $Global:Form.BackColor = $Global:Theme.BG
 $Global:Form.ForeColor = $Global:Theme.TextMain
 $Global:Form.MinimumSize = New-Object System.Drawing.Size(950, 650)
 try {
-    $iconPath = Join-Path $Global:ScriptDir "SHADOWIEX_LOGO.ico"
-    if (Test-Path $iconPath) { $Global:Form.Icon = New-Object System.Drawing.Icon($iconPath) }
+    if ($Global:IconPath -and (Test-Path $Global:IconPath)) {
+        $Global:Form.Icon = New-Object System.Drawing.Icon($Global:IconPath)
+    }
 } catch {}
 
 # ============================================================================
