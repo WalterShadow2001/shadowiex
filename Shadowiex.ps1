@@ -15,19 +15,30 @@
 #  SPLASH / CARGA EN CONSOLA
 # ============================================================================
 Clear-Host
-Write-Host "" -ForegroundColor DarkCyan
-Write-Host "     SHADOWIEX" -ForegroundColor Cyan
-Write-Host "     Professional PC Toolkit" -ForegroundColor DarkGray
-Write-Host "     v14.2" -ForegroundColor DarkGray
-Write-Host "" -ForegroundColor DarkCyan
+Write-Host ""
+Write-Host "  ╔══════════════════════════════════════╗" -ForegroundColor DarkCyan
+Write-Host "  ║                                      ║" -ForegroundColor DarkCyan
+Write-Host "  ║" -NoNewline -ForegroundColor DarkCyan
+Write-Host "         S H A D O W I E X         " -NoNewline -ForegroundColor Cyan
+Write-Host "║" -ForegroundColor DarkCyan
+Write-Host "  ║" -NoNewline -ForegroundColor DarkCyan
+Write-Host "     Professional PC Toolkit      " -NoNewline -ForegroundColor Gray
+Write-Host "║" -ForegroundColor DarkCyan
+Write-Host "  ║" -NoNewline -ForegroundColor DarkCyan
+Write-Host "              v14.2               " -NoNewline -ForegroundColor DarkGray
+Write-Host "║" -ForegroundColor DarkCyan
+Write-Host "  ║                                      ║" -ForegroundColor DarkCyan
+Write-Host "  ╚══════════════════════════════════════╝" -ForegroundColor DarkCyan
+Write-Host ""
 
 $LoadSteps = @(
-    @{Text = "  [1/6] Verificando privilegios de administrador...";     Color = "Cyan"},
-    @{Text = "  [2/6] Cargando ensamblados de interfaz...";             Color = "Cyan"},
-    @{Text = "  [3/6] Detectando hardware del sistema...";              Color = "Cyan"},
-    @{Text = "  [4/6] Escaneando carpeta de instaladores...";           Color = "Cyan"},
-    @{Text = "  [5/6] Buscando MAS_AIO.cmd...";                        Color = "Cyan"},
-    @{Text = "  [6/6] Iniciando interfaz grafica...";                   Color = "Cyan"}
+    @{Text = "  [1/7] Verificando privilegios de administrador...";     Color = "Cyan"},
+    @{Text = "  [2/7] Cargando ensamblados de interfaz...";             Color = "Cyan"},
+    @{Text = "  [3/7] Detectando hardware del sistema...";              Color = "Cyan"},
+    @{Text = "  [4/7] Escaneando carpeta de instaladores...";           Color = "Cyan"},
+    @{Text = "  [5/7] Buscando MAS_AIO.cmd...";                        Color = "Cyan"},
+    @{Text = "  [6/7] Descargando logo...";                             Color = "Cyan"},
+    @{Text = "  [7/7] Iniciando interfaz grafica...";                   Color = "Cyan"}
 )
 
 for ($i = 0; $i -lt $LoadSteps.Count; $i++) {
@@ -105,6 +116,23 @@ if (-not $Global:ScriptDir) { $Global:ScriptDir = (Get-Location).Path }
 
 $Global:InstaladoresDir = Join-Path $Global:ScriptDir "instaladores"
 $Global:LogFile = Join-Path $env:TEMP "SHADOWIEX_log.txt"
+
+# Descargar logo PNG desde GitHub si no existe localmente (cache en TEMP)
+$Global:LogoPath = $null
+$localLogo = Join-Path $Global:ScriptDir "SHADOWIEX_LOGO.png"
+$cachedLogo = Join-Path $env:TEMP "SHADOWIEX_LOGO.png"
+if (Test-Path $localLogo) {
+    $Global:LogoPath = $localLogo
+} elseif (Test-Path $cachedLogo) {
+    $Global:LogoPath = $cachedLogo
+} else {
+    try {
+        [Net.ServicePointManager]::SecurityProtocol = 3072
+        $logoUrl = "https://raw.githubusercontent.com/WalterShadow2001/shadowiex/main/SHADOWIEX_LOGO.png"
+        (New-Object System.Net.WebClient).DownloadFile($logoUrl, $cachedLogo)
+        if (Test-Path $cachedLogo) { $Global:LogoPath = $cachedLogo }
+    } catch {}
+}
 
 # Tooltip global
 $Global:ToolTip = New-Object System.Windows.Forms.ToolTip
@@ -332,9 +360,10 @@ $LogoPB.Location = New-Object System.Drawing.Point(15, 10)
 $LogoPB.Size = New-Object System.Drawing.Size(40, 40)
 $LogoPB.SizeMode = [System.Windows.Forms.PictureBoxSizeMode]::Zoom
 $LogoPB.BackColor = [System.Drawing.Color]::Transparent
-$logoPngPath = Join-Path $Global:ScriptDir "SHADOWIEX_LOGO.png"
 try {
-    if (Test-Path $logoPngPath) { $LogoPB.Image = New-Object System.Drawing.Bitmap($logoPngPath) }
+    if ($Global:LogoPath -and (Test-Path $Global:LogoPath)) {
+        $LogoPB.Image = New-Object System.Drawing.Bitmap($Global:LogoPath)
+    }
 } catch {}
 $HeaderPanel.Controls.Add($LogoPB)
 
