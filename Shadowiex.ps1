@@ -1,6 +1,6 @@
 <#
 .SYNOPSIS
-    SHADOWIEX v14.4 - Professional PC Toolkit
+    SHADOWIEX v14.5 - Professional PC Toolkit
 .DESCRIPTION
     Herramienta profesional de diagnostico, reparacion, instalacion y activacion.
     Integracion completa con MAS (iex online + offline).
@@ -39,7 +39,7 @@ foreach ($line in $SplashLines) {
     Write-Host $line -ForegroundColor White
 }
 Write-Host ""
-Write-Host "                       Professional PC Toolkit  v14.4" -ForegroundColor Gray
+Write-Host "                       Professional PC Toolkit  v14.5" -ForegroundColor Gray
 Write-Host ""
 
 $LoadSteps = @(
@@ -756,7 +756,80 @@ $InstallLeftPanel.AutoScroll = $true
 $InstallLeftPanel.BackColor = $Global:Theme.BG
 $TabInstall.Controls.Add($InstallLeftPanel)
 
-$InstallLeftPanel.Controls.Add((New-SectionTitle -Text "INSTALAR APLICACIONES (WINGET / CHOCO)" -X 10 -Y 5))
+$InstallLeftPanel.Controls.Add((New-SectionTitle -Text "GESTOR DE PAQUETES" -X 10 -Y 5 -W 300))
+
+# --- Estado de winget y choco con botones de instalacion ---
+$PkgY = 30
+$HasW = Test-Winget; $HasC = Test-Choco
+
+# Winget status card
+$WCard = New-Object System.Windows.Forms.Panel
+$WCard.Location = New-Object System.Drawing.Point(10, $PkgY)
+$WCard.Size = New-Object System.Drawing.Size(255, 52)
+$WCard.BackColor = $Global:Theme.SurfaceLight
+$InstallLeftPanel.Controls.Add($WCard)
+$WCard.Controls.Add((New-Object System.Windows.Forms.Label -Property @{
+    Text = "WINGET"; Location = New-Object System.Drawing.Point(10, 4)
+    Size = New-Object System.Drawing.Size(80, 18); Font = $Global:Fonts.Header; ForeColor = $Global:Theme.TextDim
+}))
+$WStatusText = if ($HasW) { "Instalado" } else { "No encontrado" }
+$WStatusColor = if ($HasW) { $Global:Theme.Success } else { $Global:Theme.Danger }
+$WCard.Controls.Add((New-Object System.Windows.Forms.Label -Property @{
+    Text = $WStatusText; Location = New-Object System.Drawing.Point(90, 5)
+    Size = New-Object.System.Drawing.Size(90, 16); Font = $Global:Fonts.Small; ForeColor = $WStatusColor
+}))
+if (-not $HasW) {
+    $InstWBtn = New-Btn -Text "INSTALAR" -X 185 -Y 2 -W 65 -H 24 -Color "Primary"
+    $InstWBtn.Font = $Global:Fonts.Small
+    $InstWBtn.Add_Click({
+        Update-Status "Instalando winget..."
+        try {
+            Start-Process "powershell" -ArgumentList "-NoProfile -ExecutionPolicy Bypass -Command `"`$progressPreference='silently'; Invoke-WebRequest -Uri https://aka.ms/getwinget -OutFile `$env:TEMP\Microsoft.DesktopAppInstaller.msixbundle; Add-AppxPackage -Path `$env:TEMP\Microsoft.DesktopAppInstaller.msixbundle`"" -Verb RunAs -Wait
+                Update-Status "winget instalado - reinicia SHADOWIEX" "success"
+                Write-Log "winget instalado"
+            } catch { Update-Status "Error instalando winget" "error" }
+        })
+    $WCard.Controls.Add($InstWBtn)
+}
+$WCard.Controls.Add((New-DescLabel -Text "Gestor de paquetes de Microsoft" -X 10 -Y 28 -W 235 -H 16))
+
+# Choco status card
+$CCard = New-Object System.Windows.Forms.Panel
+$CCard.Location = New-Object System.Drawing.Point(275, $PkgY)
+$CCard.Size = New-Object System.Drawing.Size(270, 52)
+$CCard.BackColor = $Global:Theme.SurfaceLight
+$InstallLeftPanel.Controls.Add($CCard)
+$CCard.Controls.Add((New-Object System.Windows.Forms.Label -Property @{
+    Text = "CHOCOLATEY"; Location = New-Object System.Drawing.Point(10, 4)
+    Size = New-Object System.Drawing.Size(100, 18); Font = $Global:Fonts.Header; ForeColor = $Global:Theme.TextDim
+}))
+$CStatusText = if ($HasC) { "Instalado" } else { "No encontrado" }
+$CStatusColor = if ($HasC) { $Global:Theme.Success } else { $Global:Theme.Danger }
+$CCard.Controls.Add((New-Object System.Windows.Forms.Label -Property @{
+    Text = $CStatusText; Location = New-Object System.Drawing.Point(110, 5)
+    Size = New-Object.System.Drawing.Size(90, 16); Font = $Global:Fonts.Small; ForeColor = $CStatusColor
+}))
+if (-not $HasC) {
+    $InstCBtn = New-Btn -Text "INSTALAR" -X 195 -Y 2 -W 65 -H 24 -Color "Primary"
+    $InstCBtn.Font = $Global:Fonts.Small
+    $InstCBtn.Add_Click({
+        Update-Status "Instalando Chocolatey..."
+        try {
+            Set-ExecutionPolicy Bypass -Scope Process -Force
+            [System.Net.ServicePointManager]::SecurityProtocol = 3072
+            Invoke-Expression ((New-Object System.Net.WebClient).DownloadString('https://community.chocolatey.org/install.ps1'))
+            Update-Status "Chocolatey instalado - reinicia SHADOWIEX" "success"
+            Write-Log "Chocolatey instalado"
+        } catch { Update-Status "Error instalando Chocolatey" "error" }
+    })
+    $CCard.Controls.Add($InstCBtn)
+}
+$CCard.Controls.Add((New-DescLabel -Text "Gestor de paquetes alternativo" -X 10 -Y 28 -W 250 -H 16))
+
+# --- Lista de programas ---
+$PkgY = 92
+$InstallLeftPanel.Controls.Add((New-SectionTitle -Text "PROGRAMAS DISPONIBLES" -X 10 -Y $PkgY -W 300))
+$PkgY += 28
 
 $SoftwareData = @{
     "NAVEGADORES" = @(
@@ -807,29 +880,29 @@ $SoftwareData = @{
 }
 
 $Global:AllCheckboxes = @()
-$YPos = 30
+$YPos = $PkgY
 
 foreach ($Cat in $SoftwareData.Keys) {
     $CatPanel = New-Object System.Windows.Forms.Panel
     $CatPanel.Location = New-Object System.Drawing.Point(5, $YPos)
-    $CatPanel.Size = New-Object System.Drawing.Size(530, 24)
+    $CatPanel.Size = New-Object System.Drawing.Size(535, 22)
     $CatPanel.BackColor = $Global:Theme.Surface
     $InstallLeftPanel.Controls.Add($CatPanel)
     $CatLabel = New-Object System.Windows.Forms.Label
     $CatLabel.Text = "  $Cat"
-    $CatLabel.Location = New-Object System.Drawing.Point(2, 2)
-    $CatLabel.Size = New-Object System.Drawing.Size(300, 20)
+    $CatLabel.Location = New-Object System.Drawing.Point(2, 1)
+    $CatLabel.Size = New-Object System.Drawing.Size(300, 18)
     $CatLabel.Font = $Global:Fonts.Header
     $CatLabel.ForeColor = $Global:Theme.TextDim
     $CatPanel.Controls.Add($CatLabel)
 
-    $YPos += 26
-    $XPos = 15
+    $YPos += 25
+    $XPos = 12
     foreach ($App in $SoftwareData[$Cat]) {
         $CB = New-Object System.Windows.Forms.CheckBox
         $CB.Text = $App.Name
         $CB.Location = New-Object System.Drawing.Point($XPos, $YPos)
-        $CB.Size = New-Object System.Drawing.Size(165, 22)
+        $CB.Size = New-Object System.Drawing.Size(168, 20)
         $CB.Font = $Global:Fonts.Normal
         $CB.ForeColor = $Global:Theme.TextMain
         $CB.BackColor = $Global:Theme.BG
@@ -841,10 +914,10 @@ foreach ($Cat in $SoftwareData.Keys) {
         })
         $InstallLeftPanel.Controls.Add($CB)
         $Global:AllCheckboxes += $CB
-        $XPos += 170
-        if ($XPos -gt 500) { $XPos = 15; $YPos += 24 }
+        $XPos += 172
+        if ($XPos -gt 520) { $XPos = 12; $YPos += 22 }
     }
-    $YPos += 32
+    $YPos += 28
 }
 
 # --- Panel derecho ---
@@ -857,24 +930,61 @@ $TabInstall.Controls.Add($InstallRightPanel)
 
 $InstallRightPanel.Controls.Add((New-SectionTitle -Text "ACCIONES" -X 15 -Y 10 -W 200))
 
+# --- Ruta de descarga ---
+$DlPathLabel = New-Object System.Windows.Forms.Label
+$DlPathLabel.Text = "Ruta de descarga:"
+$DlPathLabel.Location = New-Object System.Drawing.Point(15, 36)
+$DlPathLabel.Size = New-Object System.Drawing.Size(120, 18)
+$DlPathLabel.Font = $Global:Fonts.Small
+$DlPathLabel.ForeColor = $Global:Theme.TextDim
+$InstallRightPanel.Controls.Add($DlPathLabel)
+
+$Global:DownloadPath = [Environment]::GetFolderPath('Desktop')
+$DlPathBox = New-Object System.Windows.Forms.TextBox
+$DlPathBox.Text = $Global:DownloadPath
+$DlPathBox.Location = New-Object System.Drawing.Point(15, 54)
+$DlPathBox.Size = New-Object System.Drawing.Size(350, 22)
+$DlPathBox.Font = $Global:Fonts.Small
+$DlPathBox.ForeColor = $Global:Theme.TextMain
+$DlPathBox.BackColor = $Global:Theme.Surface
+$DlPathBox.BorderStyle = [System.Windows.Forms.BorderStyle]::FixedSingle
+$InstallRightPanel.Controls.Add($DlPathBox)
+
+$BrowseBtn = New-Btn -Text "..." -X 370 -Y 52 -W 40 -H 26 -Color "Secondary"
+$BrowseBtn.Font = $Global:Fonts.Small
+$BrowseBtn.Add_Click({
+    $FBD = New-Object System.Windows.Forms.FolderBrowserDialog
+    $FBD.Description = "Selecciona donde guardar las descargas"
+    $FBD.SelectedPath = $Global:DownloadPath
+    if ($FBD.ShowDialog() -eq 'OK') {
+        $Global:DownloadPath = $FBD.SelectedPath
+        $DlPathBox.Text = $FBD.SelectedPath
+        Write-Log "Ruta de descarga: $($FBD.SelectedPath)"
+    }
+})
+$InstallRightPanel.Controls.Add($BrowseBtn)
+
+# --- Contador y botones ---
 $Global:CountLabel = New-Object System.Windows.Forms.Label
 $Global:CountLabel.Text = "0 seleccionados"
-$Global:CountLabel.Location = New-Object System.Drawing.Point(15, 36)
-$Global:CountLabel.Size = New-Object System.Drawing.Size(200, 20)
-$Global:CountLabel.Font = $Global:Fonts.Normal
+$Global:CountLabel.Location = New-Object System.Drawing.Point(420, 36)
+$Global:CountLabel.Size = New-Object System.Drawing.Size(70, 18)
+$Global:CountLabel.Font = $Global:Fonts.Small
 $Global:CountLabel.ForeColor = $Global:Theme.TextMuted
+$Global:CountLabel.TextAlign = "MiddleRight"
 $InstallRightPanel.Controls.Add($Global:CountLabel)
 
 $Global:AllChecked = $false
-$ToggleBtn = New-Btn -Text "SELECCIONAR TODO" -X 15 -Y 62 -W 200 -H 34 -Color "Secondary"
+$ToggleBtn = New-Btn -Text "SELECCIONAR TODO" -X 415 -Y 54 -W 90 -H 24 -Color "Secondary"
+$ToggleBtn.Font = $Global:Fonts.Small
 $ToggleBtn.Add_Click({
     $Global:AllChecked = -not $Global:AllChecked
-    $ToggleBtn.Text = if ($Global:AllChecked) { "QUITAR TODO" } else { "SELECCIONAR TODO" }
+    $ToggleBtn.Text = if ($Global:AllChecked) { "QUITAR TODO" } else { "SELECC.TODO" }
     foreach ($CB in $Global:AllCheckboxes) { $CB.Checked = $Global:AllChecked }
 })
 $InstallRightPanel.Controls.Add($ToggleBtn)
 
-$InstallBtn = New-Btn -Text "INSTALAR SELECCIONADOS" -X 15 -Y 106 -W 200 -H 38 -Color "Success"
+$InstallBtn = New-Btn -Text "INSTALAR SELECCIONADOS" -X 15 -Y 84 -W 220 -H 34 -Color "Success"
 $InstallBtn.Add_Click({
     $Selected = $Global:AllCheckboxes | Where-Object { $_.Checked }
     if ($Selected.Count -eq 0) { [System.Windows.Forms.MessageBox]::Show("Selecciona al menos un programa.", "SHADOWIEX"); return }
@@ -1004,11 +1114,11 @@ $InstallBtn.Add_Click({
 $InstallRightPanel.Controls.Add($InstallBtn)
 
 # --- DESCARGAS DIRECTAS: OFFICE C2R (ES-MX) + OPTIMIZER ---
-$DlY = 160
+$DlY = 126
 $InstallRightPanel.Controls.Add((New-SectionTitle -Text "OFFICE C2R - ESPANOL MEXICO" -X 15 -Y $DlY -W 400))
-$DlY += 26
+$DlY += 24
 $InstallRightPanel.Controls.Add((New-DescLabel -Text "Enlaces oficiales Microsoft via massgrave.dev (es-MX)" -X 15 -Y $DlY -W 460))
-$DlY += 26
+$DlY += 22
 
 # Datos de Office organizados por version (solo x64, los mas utiles)
 $OfficeDownloads = @{
@@ -1045,90 +1155,94 @@ foreach ($Ver in $OfficeDownloads.Keys) {
     # Version header
     $VerPanel = New-Object System.Windows.Forms.Panel
     $VerPanel.Location = New-Object System.Drawing.Point(15, $DlY)
-    $VerPanel.Size = New-Object System.Drawing.Size(470, 22)
+    $VerPanel.Size = New-Object System.Drawing.Size(470, 20)
     $VerPanel.BackColor = $Global:Theme.Surface
     $InstallRightPanel.Controls.Add($VerPanel)
     $VerPanel.Controls.Add((New-Object System.Windows.Forms.Label -Property @{
         Text = "  $Ver"; Location = New-Object System.Drawing.Point(2, 1)
-        Size = New-Object System.Drawing.Size(300, 18); Font = $Global:Fonts.Header; ForeColor = $Global:Theme.TextDim
+        Size = New-Object System.Drawing.Size(300, 16); Font = $Global:Fonts.Header; ForeColor = $Global:Theme.TextDim
     }))
-    $DlY += 26
+    $DlY += 23
 
     foreach ($Item in $OfficeDownloads[$Ver]) {
         $Card = New-Object System.Windows.Forms.Panel
         $Card.Location = New-Object System.Drawing.Point(15, $DlY)
-        $Card.Size = New-Object System.Drawing.Size(470, 36)
+        $Card.Size = New-Object System.Drawing.Size(470, 34)
         $Card.BackColor = $Global:Theme.SurfaceLight
         $InstallRightPanel.Controls.Add($Card)
 
         $Card.Controls.Add((New-Object System.Windows.Forms.Label -Property @{
-            Text = $Item.Name; Location = New-Object System.Drawing.Point(10, 8)
-            Size = New-Object System.Drawing.Size(280, 20); Font = $Global:Fonts.Normal; ForeColor = $Global:Theme.TextMain
+            Text = $Item.Name; Location = New-Object System.Drawing.Point(10, 7)
+            Size = New-Object System.Drawing.Size(290, 20); Font = $Global:Fonts.Normal; ForeColor = $Global:Theme.TextMain
         }))
 
         # Capturar variables para closure
         $DL_PID = $Item.PID
         $DL_Name = $Item.Name
 
-        $DLBtn = New-Btn -Text "DESCARGAR" -X 370 -Y 3 -W 90 -H 30 -Color "Primary"
+        $DLBtn = New-Btn -Text "DESCARGAR" -X 375 -Y 2 -W 88 -H 28 -Color "Primary"
+        $DLBtn.Font = $Global:Fonts.Small
         $DLBtn.Add_Click({
             $Url = "https://c2rsetup.officeapps.live.com/c2r/download.aspx?ProductreleaseID=$($DL_PID)&platform=x64&language=es-mx&version=O16GA"
+            $DestPath = Join-Path $Global:DownloadPath "$($DL_PID)_x64_es-mx.exe"
             Update-Status "Descargando $($DL_Name)..."
             Write-Log "Descarga Office: $($DL_Name) ($($DL_PID))"
             try {
-                $SavePath = Join-Path ([Environment]::GetFolderPath('Desktop')) "$($DL_PID)_x64_es-mx.exe"
                 [System.Net.ServicePointManager]::SecurityProtocol = [System.Net.SecurityProtocolType]::Tls12
                 $WC = New-Object System.Net.WebClient
-                $WC.DownloadFile($Url, $SavePath)
-                Update-Status "Descargado: $($DL_Name)" "success"
-                [System.Windows.Forms.MessageBox]::Show("Descarga completa:`n$SavePath", "SHADOWIEX")
+                $WC.DownloadFile($Url, $DestPath)
+                Update-Status "Descargado: $($DL_Name) - ejecutando..." "success"
+                Write-Log "Ejecutando: $DestPath"
+                Start-Process $DestPath -Verb RunAs
             } catch {
                 Update-Status "Error descargando $($DL_Name)" "error"
                 [System.Windows.Forms.MessageBox]::Show("Error al descargar:`n$($_.Exception.Message)", "SHADOWIEX - Error")
             }
         }.GetNewClosure())
         $Card.Controls.Add($DLBtn)
-        $DlY += 42
+        $DlY += 38
     }
-    $DlY += 8
+    $DlY += 4
 }
 
-# --- OPTIMIZER NXT ---
-$DlY += 4
+# --- OPTIMIZER ---
+$DlY += 2
 $InstallRightPanel.Controls.Add((New-Object System.Windows.Forms.Panel -Property @{
     Location = New-Object System.Drawing.Point(15, $DlY)
     Size = New-Object System.Drawing.Size(470, 1)
     BackColor = $Global:Theme.Border
 }))
-$DlY += 10
+$DlY += 8
 $InstallRightPanel.Controls.Add((New-SectionTitle -Text "HERRAMIENTAS EXTRAS" -X 15 -Y $DlY -W 300))
-$DlY += 28
+$DlY += 24
 
 $OptCard = New-Object System.Windows.Forms.Panel
 $OptCard.Location = New-Object System.Drawing.Point(15, $DlY)
-$OptCard.Size = New-Object System.Drawing.Size(470, 44)
+$OptCard.Size = New-Object System.Drawing.Size(470, 40)
 $OptCard.BackColor = $Global:Theme.SurfaceLight
 $InstallRightPanel.Controls.Add($OptCard)
 $OptCard.Controls.Add((New-Object System.Windows.Forms.Label -Property @{
-    Text = "Optimizer NXT (github.com/hellzerg)"; Location = New-Object System.Drawing.Point(10, 4)
+    Text = "Optimizer v16.7 (github.com/hellzerg)"; Location = New-Object System.Drawing.Point(10, 3)
     Size = New-Object System.Drawing.Size(320, 18); Font = $Global:Fonts.Normal; ForeColor = $Global:Theme.TextMain
 }))
-$OptCard.Controls.Add((New-DescLabel -Text "Optimizador de Windows - Limpieza y rendimiento" -X 10 -Y 24 -W 320 -H 16))
+$OptCard.Controls.Add((New-DescLabel -Text "Optimizador de Windows - Limpieza y rendimiento" -X 10 -Y 21 -W 320 -H 16))
 
-$OptBtn = New-Btn -Text "DESCARGAR" -X 370 -Y 6 -W 90 -H 32 -Color "Accent"
+$OptBtn = New-Btn -Text "DESCARGAR" -X 375 -Y 4 -W 88 -H 30 -Color "Accent"
+$OptBtn.Font = $Global:Fonts.Small
 $OptBtn.Add_Click({
-    Update-Status "Descargando Optimizer NXT..."
-    Write-Log "Descarga: Optimizer NXT"
+    $OptUrl = "https://github.com/hellzerg/optimizer/releases/download/16.7/Optimizer-16.7.exe"
+    $OptDest = Join-Path $Global:DownloadPath "Optimizer-16.7.exe"
+    Update-Status "Descargando Optimizer v16.7..."
+    Write-Log "Descarga: Optimizer v16.7"
     try {
-        $Url = "https://github.com/hellzerg/OptimizerNXT/releases/latest/download/optimizerNXT.exe"
-        $SavePath = Join-Path ([Environment]::GetFolderPath('Desktop')) "optimizerNXT.exe"
         [System.Net.ServicePointManager]::SecurityProtocol = [System.Net.SecurityProtocolType]::Tls12
         $WC = New-Object System.Net.WebClient
-        $WC.DownloadFile($Url, $SavePath)
-        Update-Status "Optimizer NXT descargado" "success"
-        [System.Windows.Forms.MessageBox]::Show("Descarga completa:`n$SavePath", "SHADOWIEX")
+        $WC.DownloadFile($OptUrl, $OptDest)
+        Update-Status "Optimizer descargado - ejecutando..." "success"
+        Write-Log "Ejecutando: $OptDest"
+        Start-Process $OptDest -Verb RunAs
     } catch {
-        Update-Status "Error descargando Optimizer NXT" "error"
+        Update-Status "Error descargando Optimizer" "error"
         [System.Windows.Forms.MessageBox]::Show("Error al descargar:`n$($_.Exception.Message)", "SHADOWIEX - Error")
     }
 })
