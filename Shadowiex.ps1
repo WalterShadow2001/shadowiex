@@ -1355,6 +1355,13 @@ $TabTweaks.Controls.Add($TweakScroll)
 $TweakScroll.Controls.Add((New-SectionTitle -Text "OPTIMIZACION DEL SISTEMA" -X 15 -Y 10))
 
 $TweaksList = @(
+    @{Name="CHRIS TITUS TOOL"; Desc="Herramienta de optimizacion de Chris Titus"; Color="Primary"; Action={
+        Update-Status "Lanzando Chris Titus WinUtil..."
+        try {
+            Start-Process powershell.exe -ArgumentList '-NoProfile -ExecutionPolicy Bypass -Command "irm christitus.com/win | iex"' -Verb RunAs
+            Update-Status "Chris Titus Tool lanzado" "success"; Write-Log "Chris Titus Tool lanzado"
+        } catch { Update-Status "Error lanzando Chris Titus Tool" "error" }
+    }},
     @{Name="ESSENTIAL TWEAKS"; Desc="Optimizaciones de rendimiento"; Color="Success"; Action={
         Update-Status "Aplicando Essential Tweaks..."
         try {
