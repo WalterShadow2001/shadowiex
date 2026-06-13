@@ -15,20 +15,11 @@
 #  SPLASH / CARGA EN CONSOLA
 # ============================================================================
 Clear-Host
-$Logo = @"
-
-     ███████╗███████╗███╗   ██╗████████╗
-     ██╔════╝██╔════╝████╗  ██║╚══██╔══╝
-     ███████╗█████╗  ██╔██╗ ██║   ██║
-     ╚════██║██╔══╝  ██║╚██╗██║   ██║
-     ███████║███████╗██║ ╚████║   ██║
-     ╚══════╝╚══════╝╚═╝  ╚═══╝   ╚═╝
-
-           Professional PC Toolkit
-                 v14.1
-
-"@
-Write-Host $Logo -ForegroundColor DarkCyan
+Write-Host "" -ForegroundColor DarkCyan
+Write-Host "     SHADOWIEX" -ForegroundColor Cyan
+Write-Host "     Professional PC Toolkit" -ForegroundColor DarkGray
+Write-Host "     v14.1" -ForegroundColor DarkGray
+Write-Host "" -ForegroundColor DarkCyan
 
 $LoadSteps = @(
     @{Text = "  [1/6] Verificando privilegios de administrador...";     Color = "Cyan"},
@@ -101,7 +92,7 @@ $Global:Fonts = @{
     Header  = New-Object System.Drawing.Font("Segoe UI", 11, [System.Drawing.FontStyle]::Bold)
     Normal  = New-Object System.Drawing.Font("Segoe UI", 9)
     Small   = New-Object System.Drawing.Font("Segoe UI", 8)
-    Button  = New-Object System.Drawing.Font("Segoe UI", 9, [System.Drawing.FontStyle]::SemiBold)
+    Button  = New-Object System.Drawing.Font("Segoe UI", 9, [System.Drawing.FontStyle]::Bold)
     Mono    = New-Object System.Drawing.Font("Consolas", 9)
 }
 
@@ -269,11 +260,11 @@ function Add-InfoRow {
         [string]$Label, [string]$Value,
         [int]$X, [int]$Y,
         [int]$LabelW = 140, [int]$ValueW = 350,
-        [System.Drawing.Color]$ValueColor = $null
+        $ValueColor = $null
     )
     $Lbl = New-Object System.Windows.Forms.Label
     $Lbl.Text = $Label
-    $Lbl.Location = New-Object System.Drawing.Point($X, $Y)
+    $Lbl.Location = New-Object System.Drawing.Point([int]$X, [int]$Y)
     $Lbl.Size = New-Object System.Drawing.Size($LabelW, 20)
     $Lbl.Font = $Global:Fonts.Normal
     $Lbl.ForeColor = $Global:Theme.TextMuted
@@ -281,10 +272,15 @@ function Add-InfoRow {
 
     $Val = New-Object System.Windows.Forms.Label
     $Val.Text = $Value
-    $Val.Location = New-Object System.Drawing.Point($X + $LabelW, $Y)
+    $xPos = [int]$X + [int]$LabelW
+    $Val.Location = New-Object System.Drawing.Point($xPos, [int]$Y)
     $Val.Size = New-Object System.Drawing.Size($ValueW, 20)
     $Val.Font = $Global:Fonts.Normal
-    $Val.ForeColor = if ($ValueColor) { $ValueColor } else { $Global:Theme.TextMain }
+    if ($ValueColor -ne $null -and $ValueColor -is [System.Drawing.Color]) {
+        $Val.ForeColor = $ValueColor
+    } else {
+        $Val.ForeColor = $Global:Theme.TextMain
+    }
     $Parent.Controls.Add($Val)
 }
 
@@ -1117,15 +1113,23 @@ $WG = Test-Winget; $CH = Test-Choco; $masFound = Find-MAS
 $ConfigScroll.Controls.Add((New-SectionTitle -Text "HERRAMIENTAS DISPONIBLES" -X 15 -Y 10))
 
 $toolsY = 38
-Add-InfoRow -Parent $ConfigScroll -Label "Winget:" -Value $(if($WG){"Instalado"}else{"No disponible"}) -X 20 -Y $toolsY -ValueColor $(if($WG){$Global:Theme.Success}else{$Global:Theme.Danger})
+$wgVal = if($WG){"Instalado"}else{"No disponible"}
+$wgClr = if($WG){$Global:Theme.Success}else{$Global:Theme.Danger}
+Add-InfoRow -Parent $ConfigScroll -Label "Winget:" -Value $wgVal -X 20 -Y $toolsY -ValueColor $wgClr
 $toolsY += 26
-Add-InfoRow -Parent $ConfigScroll -Label "Chocolatey:" -Value $(if($CH){"Instalado"}else{"No disponible"}) -X 20 -Y $toolsY -ValueColor $(if($CH){$Global:Theme.Success}else{$Global:Theme.Danger})
+$chVal = if($CH){"Instalado"}else{"No disponible"}
+$chClr = if($CH){$Global:Theme.Success}else{$Global:Theme.Danger}
+Add-InfoRow -Parent $ConfigScroll -Label "Chocolatey:" -Value $chVal -X 20 -Y $toolsY -ValueColor $chClr
 $toolsY += 26
-Add-InfoRow -Parent $ConfigScroll -Label "MAS_AIO.cmd:" -Value $(if($masFound){"Encontrado"}else{"No encontrado"}) -X 20 -Y $toolsY -ValueColor $(if($masFound){$Global:Theme.Success}else{$Global:Theme.Warning})
+$masVal = if($masFound){"Encontrado"}else{"No encontrado"}
+$masClr = if($masFound){$Global:Theme.Success}else{$Global:Theme.Warning}
+Add-InfoRow -Parent $ConfigScroll -Label "MAS_AIO.cmd:" -Value $masVal -X 20 -Y $toolsY -ValueColor $masClr
 $toolsY += 26
 $instCount = 0
 if (Test-Path $Global:InstaladoresDir) { $instCount = (Get-ChildItem -Path $Global:InstaladoresDir -Filter "*.exe" -EA 0 | Measure-Object).Count }
-Add-InfoRow -Parent $ConfigScroll -Label "Instaladores:" -Value "$instCount archivos .exe" -X 20 -Y $toolsY -ValueColor $(if($instCount -gt 0){$Global:Theme.Success}else{$Global:Theme.Warning})
+$instVal = "$instCount archivos .exe"
+$instClr = if($instCount -gt 0){$Global:Theme.Success}else{$Global:Theme.Warning}
+Add-InfoRow -Parent $ConfigScroll -Label "Instaladores:" -Value $instVal -X 20 -Y $toolsY -ValueColor $instClr
 $toolsY += 36
 
 $ConfigScroll.Controls.Add((New-SectionTitle -Text "INFORMACION DEL SISTEMA" -X 15 -Y $toolsY))
