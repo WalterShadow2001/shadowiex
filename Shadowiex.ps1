@@ -15,59 +15,25 @@
 #  SPLASH / CARGA EN CONSOLA
 # ============================================================================
 Add-Type -AssemblyName System.Drawing
-
 Clear-Host
 
-# Extraer ICO embebido a TEMP para el splash
-$cachedIco = Join-Path $env:TEMP "SHADOWIEX_LOGO.ico"
-if (-not (Test-Path $cachedIco)) {
-    try {
-        $icoBytes = [System.Convert]::FromBase64String("
-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
-")
-        [System.IO.File]::WriteAllBytes($cachedIco, $icoBytes)
-    } catch {}
-}
-
-# Renderizar ICO como ASCII (negro = blanco)
+# Renderizar logo embebido como ASCII (desde PNG miniatura en memoria)
 $SplashLines = @()
 try {
-    $icon = New-Object System.Drawing.Icon($cachedIco)
-    $bmp = $icon.ToBitmap()
-    $targetW = 48
-    $ratio = $bmp.Height / $bmp.Width
-    $targetH = [math]::Floor($targetW * $ratio / 2)
-    $resized = New-Object System.Drawing.Bitmap($targetW, $targetH)
-    $g = [System.Drawing.Graphics]::FromImage($resized)
-    $g.InterpolationMode = [System.Drawing.Drawing2D.InterpolationMode]::HighQualityBicubic
-    $g.DrawImage($bmp, 0, 0, $targetW, $targetH)
-    $g.Dispose(); $bmp.Dispose(); $icon.Dispose()
-    for ($y = 0; $y -lt $targetH; $y++) {
+    $pngBytes = [System.Convert]::FromBase64String("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")
+    $ms = New-Object System.IO.MemoryStream(,$pngBytes)
+    $bmp = New-Object System.Drawing.Bitmap($ms)
+    for ($y = 0; $y -lt $bmp.Height; $y++) {
         $line = ""
-        for ($x = 0; $x -lt $targetW; $x++) {
-            $px = $resized.GetPixel($x, $y)
+        for ($x = 0; $x -lt $bmp.Width; $x++) {
+            $px = $bmp.GetPixel($x, $y)
             $bright = ($px.R * 0.299 + $px.G * 0.587 + $px.B * 0.114)
             if ($bright -lt 100) { $line += [char]0x2588 } else { $line += " " }
         }
         $SplashLines += $line
     }
-    $resized.Dispose()
-} catch {
-    # Fallback si falla el render
-    $SplashLines = @(
-        "                     ",
-        "      ##   #####     ",
-        "     #   ######  #   ",
-        "    #  #########  #  ",
-        "   #  #### # ##   #  ",
-        "   # #########    #  ",
-        "    ##### #####   #  ",
-        "     #   ## ###  #   ",
-        "   ### ##   ## #  ## ",
-        "    # ####     ####  ",
-        "         ##### #     "
-    )
-}
+    $bmp.Dispose(); $ms.Dispose()
+} catch {}
 
 foreach ($line in $SplashLines) {
     Write-Host $line -ForegroundColor White
@@ -1074,7 +1040,7 @@ if (Test-Path $Global:InstaladoresDir) {
                 Update-Status "Ejecutando: $($ExeDisplayName)"
                 Start-Process $ExeFullName -Verb RunAs
                 Write-Log "Ejecutado: $ExeDisplayName"
-            })
+            }.GetNewClosure())
             $Card.Controls.Add($RunBtn)
             $InstY += 50
         }
