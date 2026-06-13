@@ -347,6 +347,7 @@ function Update-Status {
 
 function Test-Winget { try { $null = winget --version 2>$null; return $true } catch { return $false } }
 function Test-Choco  { try { $null = choco --version 2>$null; return $true } catch { return $false } }
+function Test-ChocoDir { Test-Path 'C:\ProgramData\chocolatey' }
 
 # ============================================================================
 #  FORMULARIO PRINCIPAL
@@ -760,7 +761,7 @@ $InstallLeftPanel.Controls.Add((New-SectionTitle -Text "GESTOR DE PAQUETES" -X 1
 
 # --- Estado de winget y choco con botones de instalacion ---
 $PkgY = 30
-$HasW = Test-Winget; $HasC = Test-Choco
+$HasW = Test-Winget; $HasC = Test-Choco; $HasCDir = Test-ChocoDir
 
 # Winget status card
 $WCard = New-Object System.Windows.Forms.Panel
@@ -803,25 +804,33 @@ $CCard.Controls.Add((New-Object System.Windows.Forms.Label -Property @{
     Text = "CHOCOLATEY"; Location = New-Object System.Drawing.Point(10, 4)
     Size = New-Object System.Drawing.Size(100, 18); Font = $Global:Fonts.Header; ForeColor = $Global:Theme.TextDim
 }))
-$CStatusText = if ($HasC) { "Instalado" } else { "No encontrado" }
-$CStatusColor = if ($HasC) { $Global:Theme.Success } else { $Global:Theme.Danger }
+if ($HasC) { $CStatusText = "Instalado"; $CStatusColor = $Global:Theme.Success } elseif ($HasCDir) { $CStatusText = "Roto"; $CStatusColor = $Global:Theme.Warning } else { $CStatusText = "No encontrado"; $CStatusColor = $Global:Theme.Danger }
 $CCard.Controls.Add((New-Object System.Windows.Forms.Label -Property @{
     Text = $CStatusText; Location = New-Object System.Drawing.Point(110, 5)
     Size = New-Object System.Drawing.Size(90, 16); Font = $Global:Fonts.Small; ForeColor = $CStatusColor
 }))
 if (-not $HasC) {
-    $InstCBtn = New-Btn -Text "INSTALAR" -X 195 -Y 2 -W 65 -H 24 -Color "Primary"
+    $CBtnText = if ($HasCDir) { "REPARAR" } else { "INSTALAR" }
+    $InstCBtn = New-Btn -Text $CBtnText -X 195 -Y 2 -W 75 -H 24 -Color "Primary"
     $InstCBtn.Font = $Global:Fonts.Small
+    $CIsBroken = $HasCDir
     $InstCBtn.Add_Click({
-        Update-Status "Instalando Chocolatey..."
-        try {
-            Set-ExecutionPolicy Bypass -Scope Process -Force
-            [System.Net.ServicePointManager]::SecurityProtocol = 3072
-            Invoke-Expression ((New-Object System.Net.WebClient).DownloadString('https://community.chocolatey.org/install.ps1'))
-            Update-Status "Chocolatey instalado - reinicia SHADOWIEX" "success"
-            Write-Log "Chocolatey instalado"
-        } catch { Update-Status "Error instalando Chocolatey" "error" }
-    })
+        if ($CIsBroken) {
+            Update-Status "Reparando Chocolatey..."
+            try {
+                Start-Process "powershell" -ArgumentList "-NoProfile -ExecutionPolicy Bypass -Command `"Remove-Item -Recurse -Force 'C:\ProgramData\chocolatey'; Set-ExecutionPolicy Bypass -Scope Process -Force; [System.Net.ServicePointManager]::SecurityProtocol = 3072; Invoke-Expression ((New-Object System.Net.WebClient).DownloadString('https://community.chocolatey.org/install.ps1'))`"" -Verb RunAs -Wait
+                Update-Status "Chocolatey reparado - reinicia SHADOWIEX" "success"
+                Write-Log "Chocolatey reparado"
+            } catch { Update-Status "Error reparando Chocolatey" "error" }
+        } else {
+            Update-Status "Instalando Chocolatey..."
+            try {
+                Start-Process "powershell" -ArgumentList "-NoProfile -ExecutionPolicy Bypass -Command `"Set-ExecutionPolicy Bypass -Scope Process -Force; [System.Net.ServicePointManager]::SecurityProtocol = 3072; Invoke-Expression ((New-Object System.Net.WebClient).DownloadString('https://community.chocolatey.org/install.ps1'))`"" -Verb RunAs -Wait
+                Update-Status "Chocolatey instalado - reinicia SHADOWIEX" "success"
+                Write-Log "Chocolatey instalado"
+            } catch { Update-Status "Error instalando Chocolatey" "error" }
+        }
+    }.GetNewClosure())
     $CCard.Controls.Add($InstCBtn)
 }
 $CCard.Controls.Add((New-DescLabel -Text "Gestor de paquetes alternativo" -X 10 -Y 28 -W 250 -H 16))
