@@ -1,6 +1,6 @@
 <#
 .SYNOPSIS
-    SHADOWIEX v14.1 - Professional PC Toolkit
+    SHADOWIEX v14.2 - Professional PC Toolkit
 .DESCRIPTION
     Herramienta profesional de diagnostico, reparacion, instalacion y activacion.
     Integracion completa con MAS (iex online + offline).
@@ -18,7 +18,7 @@ Clear-Host
 Write-Host "" -ForegroundColor DarkCyan
 Write-Host "     SHADOWIEX" -ForegroundColor Cyan
 Write-Host "     Professional PC Toolkit" -ForegroundColor DarkGray
-Write-Host "     v14.1" -ForegroundColor DarkGray
+Write-Host "     v14.2" -ForegroundColor DarkGray
 Write-Host "" -ForegroundColor DarkCyan
 
 $LoadSteps = @(
@@ -306,7 +306,7 @@ function Test-Choco  { try { $null = choco --version 2>$null; return $true } cat
 #  FORMULARIO PRINCIPAL
 # ============================================================================
 $Global:Form = New-Object System.Windows.Forms.Form
-$Global:Form.Text = "SHADOWIEX v14.1"
+$Global:Form.Text = "SHADOWIEX v14.2"
 $Global:Form.Size = New-Object System.Drawing.Size(1100, 750)
 $Global:Form.StartPosition = "CenterScreen"
 $Global:Form.BackColor = $Global:Theme.BG
@@ -829,44 +829,93 @@ $InstallBtn.Add_Click({
     # Progress dialog con tema dark
     $ProgF = New-Object System.Windows.Forms.Form
     $ProgF.Text = "SHADOWIEX - Instalando"
-    $ProgF.Size = New-Object System.Drawing.Size(480, 160)
+    $ProgF.Size = New-Object System.Drawing.Size(520, 185)
     $ProgF.BackColor = $Global:Theme.BG
     $ProgF.StartPosition = "CenterParent"
     $ProgF.FormBorderStyle = "FixedDialog"
     $ProgF.ControlBox = $false
     $ProgF.TopMost = $true
+
+    # Header line
+    $ProgF.Controls.Add((New-Object System.Windows.Forms.Panel -Property @{
+        Location = New-Object System.Drawing.Point(20, 10)
+        Size     = New-Object System.Drawing.Size(480, 1)
+        BackColor = $Global:Theme.Border
+    }))
+
+    # Title label
+    $ProgTitle = New-Object System.Windows.Forms.Label
+    $ProgTitle.Text = "Instalacion en progreso"
+    $ProgTitle.Location = New-Object System.Drawing.Point(20, 18)
+    $ProgTitle.Size = New-Object System.Drawing.Size(480, 22)
+    $ProgTitle.Font = $Global:Fonts.Header
+    $ProgTitle.ForeColor = $Global:Theme.Highlight
+    $ProgF.Controls.Add($ProgTitle)
+
+    # Current app label
     $ProgL = New-Object System.Windows.Forms.Label
     $ProgL.Text = "Iniciando instalacion..."
-    $ProgL.Location = New-Object System.Drawing.Point(15, 15)
-    $ProgL.Size = New-Object System.Drawing.Size(440, 22)
+    $ProgL.Location = New-Object System.Drawing.Point(20, 46)
+    $ProgL.Size = New-Object System.Drawing.Size(480, 20)
     $ProgL.Font = $Global:Fonts.Normal
     $ProgL.ForeColor = $Global:Theme.TextMain
     $ProgF.Controls.Add($ProgL)
-    $ProgBar = New-Object System.Windows.Forms.ProgressBar
-    $ProgBar.Location = New-Object System.Drawing.Point(15, 45)
-    $ProgBar.Size = New-Object System.Drawing.Size(440, 25)
-    $ProgBar.Maximum = $Selected.Count
-    $ProgBar.Style = [System.Windows.Forms.ProgressBarStyle]::Continuous
-    $ProgBar.ForeColor = $Global:Theme.Primary
-    $ProgF.Controls.Add($ProgBar)
+
+    # Custom progress bar (Panel-based, works on dark theme)
+    $ProgTrack = New-Object System.Windows.Forms.Panel
+    $ProgTrack.Location = New-Object System.Drawing.Point(20, 72)
+    $ProgTrack.Size = New-Object System.Drawing.Size(400, 18)
+    $ProgTrack.BackColor = $Global:Theme.Surface
+    $ProgF.Controls.Add($ProgTrack)
+
+    $ProgFill = New-Object System.Windows.Forms.Panel
+    $ProgFill.Location = New-Object System.Drawing.Point(0, 0)
+    $ProgFill.Size = New-Object System.Drawing.Size(0, 18)
+    $ProgFill.BackColor = $Global:Theme.Primary
+    $ProgTrack.Controls.Add($ProgFill)
+
+    # Progress counter label (right of bar)
+    $ProgCount = New-Object System.Windows.Forms.Label
+    $ProgCount.Text = "0 / $($Selected.Count)"
+    $ProgCount.Location = New-Object System.Drawing.Point(428, 72)
+    $ProgCount.Size = New-Object System.Drawing.Size(70, 18)
+    $ProgCount.Font = $Global:Fonts.Small
+    $ProgCount.ForeColor = $Global:Theme.TextMuted
+    $ProgCount.TextAlign = "MiddleRight"
+    $ProgF.Controls.Add($ProgCount)
+
+    # Detail label
     $ProgDetail = New-Object System.Windows.Forms.Label
     $ProgDetail.Text = ""
-    $ProgDetail.Location = New-Object System.Drawing.Point(15, 78)
-    $ProgDetail.Size = New-Object System.Drawing.Size(350, 20)
+    $ProgDetail.Location = New-Object System.Drawing.Point(20, 96)
+    $ProgDetail.Size = New-Object System.Drawing.Size(400, 18)
     $ProgDetail.Font = $Global:Fonts.Small
     $ProgDetail.ForeColor = $Global:Theme.TextMuted
     $ProgF.Controls.Add($ProgDetail)
-    $CancelBtn = New-Btn -Text "CANCELAR" -X 370 -Y 108 -W 90 -H 30 -Color "Danger"
+
+    # Separator line
+    $ProgF.Controls.Add((New-Object System.Windows.Forms.Panel -Property @{
+        Location = New-Object System.Drawing.Point(20, 122)
+        Size     = New-Object System.Drawing.Size(480, 1)
+        BackColor = $Global:Theme.Border
+    }))
+
+    # Cancel button (bottom-right, properly inside window)
+    $CancelBtn = New-Btn -Text "CANCELAR" -X 400 -Y 132 -W 100 -H 32 -Color "Danger"
     $CancelBtn.Add_Click({ $Global:Cancelled = $true; $ProgF.Close() })
     $ProgF.Controls.Add($CancelBtn)
     $ProgF.Show()
 
     $Global:Cancelled = $false; $Step = 0; $OK = 0; $Fail = 0
+    $TrackWidth = 400
     foreach ($CB in $Selected) {
         if ($Global:Cancelled) { break }
         $Step++; $AppID = $CB.Tag; $AppName = $CB.Text
         $ProgL.Text = "[$Step/$($Selected.Count)] $AppName"
-        $ProgBar.Value = $Step
+        $ProgCount.Text = "$Step / $($Selected.Count)"
+        # Animate progress fill
+        $fillW = [math]::Max(0, [math]::Floor($Step / $Selected.Count * $TrackWidth))
+        $ProgFill.Size = New-Object System.Drawing.Size($fillW, 18)
         $ProgDetail.Text = "Buscando via winget..."
         [System.Windows.Forms.Application]::DoEvents()
         $Installed = $false
@@ -878,9 +927,15 @@ $InstallBtn.Add_Click({
             [System.Windows.Forms.Application]::DoEvents()
             try { $ChocoID = ($AppID -replace '\.','').ToLower(); $Proc = Start-Process "choco" -ArgumentList "install",$ChocoID,"-y","--force" -NoNewWindow -PassThru -Wait -EA 0; if ($Proc.ExitCode -eq 0) { $Installed = $true } } catch {}
         }
-        $ProgDetail.Text = if ($Installed) { "OK" } else { "No encontrado - verifica manualmente" }
-        if ($Installed) { $OK++ } else { $Fail++ }
+        if ($Installed) {
+            $ProgDetail.Text = "Completado"; $ProgDetail.ForeColor = $Global:Theme.Success; $OK++
+        } else {
+            $ProgDetail.Text = "No encontrado - verifica manualmente"; $ProgDetail.ForeColor = $Global:Theme.Warning; $Fail++
+        }
     }
+    # Final fill
+    $ProgFill.Size = New-Object System.Drawing.Size($TrackWidth, 18)
+    $ProgFill.BackColor = $Global:Theme.Success
     $ProgF.Close()
     if ($Global:Cancelled) { Update-Status "Instalacion cancelada" "warning" }
     else { Update-Status "Completado: $OK OK, $Fail fallidos" "success"; [System.Windows.Forms.MessageBox]::Show("Instalacion completada`n`nExitosos: $OK`nFallidos: $Fail", "SHADOWIEX") }
