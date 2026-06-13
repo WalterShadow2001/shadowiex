@@ -776,7 +776,7 @@ $WStatusText = if ($HasW) { "Instalado" } else { "No encontrado" }
 $WStatusColor = if ($HasW) { $Global:Theme.Success } else { $Global:Theme.Danger }
 $WCard.Controls.Add((New-Object System.Windows.Forms.Label -Property @{
     Text = $WStatusText; Location = New-Object System.Drawing.Point(90, 5)
-    Size = New-Object.System.Drawing.Size(90, 16); Font = $Global:Fonts.Small; ForeColor = $WStatusColor
+    Size = New-Object System.Drawing.Size(90, 16); Font = $Global:Fonts.Small; ForeColor = $WStatusColor
 }))
 if (-not $HasW) {
     $InstWBtn = New-Btn -Text "INSTALAR" -X 185 -Y 2 -W 65 -H 24 -Color "Primary"
@@ -807,7 +807,7 @@ $CStatusText = if ($HasC) { "Instalado" } else { "No encontrado" }
 $CStatusColor = if ($HasC) { $Global:Theme.Success } else { $Global:Theme.Danger }
 $CCard.Controls.Add((New-Object System.Windows.Forms.Label -Property @{
     Text = $CStatusText; Location = New-Object System.Drawing.Point(110, 5)
-    Size = New-Object.System.Drawing.Size(90, 16); Font = $Global:Fonts.Small; ForeColor = $CStatusColor
+    Size = New-Object System.Drawing.Size(90, 16); Font = $Global:Fonts.Small; ForeColor = $CStatusColor
 }))
 if (-not $HasC) {
     $InstCBtn = New-Btn -Text "INSTALAR" -X 195 -Y 2 -W 65 -H 24 -Color "Primary"
