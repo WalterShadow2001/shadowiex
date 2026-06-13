@@ -446,6 +446,40 @@ $TabDiag.Controls.Add($DiagScroll)
 $btnFullDiag = New-Btn -Text "ESCANEO COMPLETO" -X 15 -Y 10 -W 200 -H 38 -Color "Success"
 $btnFullDiag.Add_Click({
     Update-Status "Ejecutando diagnostico completo..."
+
+    # Ventana modal "Procesando..."
+    $DiagPF = New-Object System.Windows.Forms.Form
+    $DiagPF.Text = "SHADOWIEX - Diagnostico"
+    $DiagPF.Size = New-Object System.Drawing.Size(360, 130)
+    $DiagPF.BackColor = $Global:Theme.BG
+    $DiagPF.StartPosition = "CenterParent"
+    $DiagPF.FormBorderStyle = "FixedDialog"
+    $DiagPF.ControlBox = $false
+    $DiagPF.TopMost = $true
+    $DiagPF.Controls.Add((New-Object System.Windows.Forms.Label -Property @{
+        Text = "Procesando diagnostico..."; Location = New-Object System.Drawing.Point(30, 25)
+        Size = New-Object System.Drawing.Size(300, 24); Font = $Global:Fonts.Header; ForeColor = $Global:Theme.TextMain
+    }))
+    $DiagPF.Controls.Add((New-Object System.Windows.Forms.Label -Property @{
+        Text = "Esto puede tardar unos segundos."; Location = New-Object System.Drawing.Point(30, 55)
+        Size = New-Object System.Drawing.Size(300, 18); Font = $Global:Fonts.Small; ForeColor = $Global:Theme.TextMuted
+    }))
+    # Spinner bar animada
+    $DiagBarTrack = New-Object System.Windows.Forms.Panel
+    $DiagBarTrack.Location = New-Object System.Drawing.Point(30, 82)
+    $DiagBarTrack.Size = New-Object System.Drawing.Size(300, 6)
+    $DiagBarTrack.BackColor = $Global:Theme.Surface
+    $DiagPF.Controls.Add($DiagBarTrack)
+    $DiagBarFill = New-Object System.Windows.Forms.Panel
+    $DiagBarFill.Location = New-Object System.Drawing.Point(0, 0)
+    $DiagBarFill.Size = New-Object System.Drawing.Size(0, 6)
+    $DiagBarFill.BackColor = $Global:Theme.Primary
+    $DiagBarTrack.Controls.Add($DiagBarFill)
+    $DiagPF.Show()
+    [System.Windows.Forms.Application]::DoEvents()
+
+    $DiagStep = 0; $DiagTotal = 10; $DiagBarW = 300
+
     $outputBox = $Global:DiagOutputBox
     $outputBox.Text = ""
     $outputBox.Text += "=== SHADOWIEX DIAGNOSTICO COMPLETO ===`r`n"
@@ -461,6 +495,7 @@ $btnFullDiag.Add_Click({
     $outputBox.Text += "  Arquitectura:    $($OS.OSArchitecture)`r`n"
     $outputBox.Text += "  Instalado:       $($OS.InstallDate)`r`n"
     $outputBox.Text += "  Ultimo arranque: $($OS.LastBootUpTime)`r`n`r`n"
+    $DiagStep++; $DiagBarFill.Size = New-Object System.Drawing.Size([math]::Floor($DiagStep/$DiagTotal*$DiagBarW), 6)
     [System.Windows.Forms.Application]::DoEvents()
 
     # CPU
@@ -472,6 +507,7 @@ $btnFullDiag.Add_Click({
     $cpuLoad = "N/A"
     try { $cpuLoad = [math]::Round((Get-Counter '\Processor(_Total)\% Processor Time' -EA Stop).CounterSamples.CookedValue, 1).ToString() + "%" } catch { $cpuLoad = "No disponible" }
     $outputBox.Text += "  Carga actual:    $cpuLoad`r`n`r`n"
+    $DiagStep++; $DiagBarFill.Size = New-Object System.Drawing.Size([math]::Floor($DiagStep/$DiagTotal*$DiagBarW), 6)
     [System.Windows.Forms.Application]::DoEvents()
 
     # RAM
@@ -485,6 +521,7 @@ $btnFullDiag.Add_Click({
     $outputBox.Text += "  RAM visible:     $OSRAM GB`r`n"
     $outputBox.Text += "  RAM usada:       $RAMUsed GB ($RAMpct%)`r`n"
     $outputBox.Text += "  RAM libre:       $RAMFree GB`r`n`r`n"
+    $DiagStep++; $DiagBarFill.Size = New-Object System.Drawing.Size([math]::Floor($DiagStep/$DiagTotal*$DiagBarW), 6)
     [System.Windows.Forms.Application]::DoEvents()
 
     # GPU
@@ -498,6 +535,7 @@ $btnFullDiag.Add_Click({
         $outputBox.Text += "  Driver:          $($GPU.DriverVersion)`r`n"
     }
     $outputBox.Text += "`r`n"
+    $DiagStep++; $DiagBarFill.Size = New-Object System.Drawing.Size([math]::Floor($DiagStep/$DiagTotal*$DiagBarW), 6)
     [System.Windows.Forms.Application]::DoEvents()
 
     # Discos
@@ -512,6 +550,7 @@ $btnFullDiag.Add_Click({
         $outputBox.Text += "    Total: $Total GB | Usado: $Used GB ($Pct%) | Libre: $Free GB`r`n"
     }
     $outputBox.Text += "`r`n"
+    $DiagStep++; $DiagBarFill.Size = New-Object System.Drawing.Size([math]::Floor($DiagStep/$DiagTotal*$DiagBarW), 6)
     [System.Windows.Forms.Application]::DoEvents()
 
     # Red
@@ -525,6 +564,7 @@ $btnFullDiag.Add_Click({
             $outputBox.Text += "  IP:              $IP`r`n"
         }
     } catch { $outputBox.Text += "  Error obteniendo info de red`r`n" }
+    $DiagStep++; $DiagBarFill.Size = New-Object System.Drawing.Size([math]::Floor($DiagStep/$DiagTotal*$DiagBarW), 6)
     [System.Windows.Forms.Application]::DoEvents()
 
     # Windows Update
@@ -540,6 +580,7 @@ $btnFullDiag.Add_Click({
             }
         }
     } catch { $outputBox.Text += "  No se pudo verificar Windows Update`r`n" }
+    $DiagStep++; $DiagBarFill.Size = New-Object System.Drawing.Size([math]::Floor($DiagStep/$DiagTotal*$DiagBarW), 6)
     [System.Windows.Forms.Application]::DoEvents()
 
     # Activacion
@@ -551,6 +592,7 @@ $btnFullDiag.Add_Click({
             $outputBox.Text += "  Producto:  $($p.Name)`r`n  Estado:    $status`r`n`r`n"
         }
     } catch { $outputBox.Text += "  No se pudo verificar`r`n" }
+    $DiagStep++; $DiagBarFill.Size = New-Object System.Drawing.Size([math]::Floor($DiagStep/$DiagTotal*$DiagBarW), 6)
     [System.Windows.Forms.Application]::DoEvents()
 
     # Startup
@@ -558,6 +600,8 @@ $btnFullDiag.Add_Click({
     $Startups = Get-CimInstance Win32_StartupCommand
     foreach ($S in $Startups) { $outputBox.Text += "  $($S.Name)`r`n" }
     $outputBox.Text += "`r`n"
+    $DiagStep++; $DiagBarFill.Size = New-Object System.Drawing.Size([math]::Floor($DiagStep/$DiagTotal*$DiagBarW), 6)
+    [System.Windows.Forms.Application]::DoEvents()
 
     # Event log
     $outputBox.Text += "[ERRORES RECIENTES (ultimos 10)]`r`n"
@@ -571,6 +615,12 @@ $btnFullDiag.Add_Click({
     } catch { $outputBox.Text += "  No se pudo leer el log`r`n" }
 
     $outputBox.Text += "`r`n" + "=" * 50 + "`r`nDiagnostico completado`r`n"
+
+    # Cerrar ventana de procesando
+    $DiagBarFill.Size = New-Object System.Drawing.Size($DiagBarW, 6)
+    [System.Windows.Forms.Application]::DoEvents()
+    $DiagPF.Close()
+
     Update-Status "Diagnostico completado" "success"
     Write-Log "Diagnostico completo ejecutado"
 })
@@ -1011,7 +1061,7 @@ $InstallBtn.Add_Click({
     # Progress dialog con tema dark
     $ProgF = New-Object System.Windows.Forms.Form
     $ProgF.Text = "SHADOWIEX - Instalando"
-    $ProgF.Size = New-Object System.Drawing.Size(520, 185)
+    $ProgF.Size = New-Object System.Drawing.Size(520, 230)
     $ProgF.BackColor = $Global:Theme.BG
     $ProgF.StartPosition = "CenterParent"
     $ProgF.FormBorderStyle = "FixedDialog"
@@ -1083,7 +1133,7 @@ $InstallBtn.Add_Click({
     }))
 
     # Cancel button (bottom-right, properly inside window)
-    $CancelBtn = New-Btn -Text "CANCELAR" -X 400 -Y 132 -W 100 -H 32 -Color "Danger"
+    $CancelBtn = New-Btn -Text "CANCELAR" -X 400 -Y 178 -W 100 -H 34 -Color "Danger"
     $CancelBtn.Add_Click({ $Global:Cancelled = $true; $ProgF.Close() })
     $ProgF.Controls.Add($CancelBtn)
     $ProgF.Show()
