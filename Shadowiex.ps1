@@ -326,17 +326,29 @@ $HeaderPanel.Height = 60
 $HeaderPanel.BackColor = $Global:Theme.Surface
 $Global:Form.Controls.Add($HeaderPanel)
 
+# Logo PNG in header
+$LogoPB = New-Object System.Windows.Forms.PictureBox
+$LogoPB.Location = New-Object System.Drawing.Point(15, 10)
+$LogoPB.Size = New-Object System.Drawing.Size(40, 40)
+$LogoPB.SizeMode = [System.Windows.Forms.PictureBoxSizeMode]::Zoom
+$LogoPB.BackColor = [System.Drawing.Color]::Transparent
+$logoPngPath = Join-Path $Global:ScriptDir "SHADOWIEX_LOGO.png"
+try {
+    if (Test-Path $logoPngPath) { $LogoPB.Image = New-Object System.Drawing.Bitmap($logoPngPath) }
+} catch {}
+$HeaderPanel.Controls.Add($LogoPB)
+
 $TitleLabel = New-Object System.Windows.Forms.Label
 $TitleLabel.Text = "SHADOWIEX"
-$TitleLabel.Location = New-Object System.Drawing.Point(20, 12)
+$TitleLabel.Location = New-Object System.Drawing.Point(62, 12)
 $TitleLabel.Size = New-Object System.Drawing.Size(180, 36)
 $TitleLabel.Font = $Global:Fonts.Title
 $TitleLabel.ForeColor = $Global:Theme.Highlight
 $HeaderPanel.Controls.Add($TitleLabel)
 
 $VersionLabel = New-Object System.Windows.Forms.Label
-$VersionLabel.Text = "v14.1 Professional"
-$VersionLabel.Location = New-Object System.Drawing.Point(185, 25)
+$VersionLabel.Text = "v14.2 Professional"
+$VersionLabel.Location = New-Object System.Drawing.Point(230, 25)
 $VersionLabel.Size = New-Object System.Drawing.Size(130, 18)
 $VersionLabel.Font = $Global:Fonts.Small
 $VersionLabel.ForeColor = $Global:Theme.TextDim
