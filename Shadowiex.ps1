@@ -1,10 +1,10 @@
 <#
 .SYNOPSIS
-    SHADOWIEX v14.3 - Professional PC Toolkit
+    SHADOWIEX v14.4 - Professional PC Toolkit
 .DESCRIPTION
     Herramienta profesional de diagnostico, reparacion, instalacion y activacion.
     Integracion completa con MAS (iex online + offline).
-    Carpeta instaladores para Office y herramientas.
+    Descargas directas Office C2R (es-MX) y herramientas.
     6 pestanas: DIAGNOSTICO, REPARAR, INSTALAR, ACTIVAR, OPTIMIZAR, CONFIG
 .NOTES
     Autor: WDPN (WalterShadow2001)
@@ -39,14 +39,14 @@ foreach ($line in $SplashLines) {
     Write-Host $line -ForegroundColor White
 }
 Write-Host ""
-Write-Host "                       Professional PC Toolkit  v14.3" -ForegroundColor Gray
+Write-Host "                       Professional PC Toolkit  v14.4" -ForegroundColor Gray
 Write-Host ""
 
 $LoadSteps = @(
     @{Text = "  [1/6] Verificando privilegios de administrador...";     Color = "Cyan"},
     @{Text = "  [2/6] Cargando ensamblados de interfaz...";             Color = "Cyan"},
     @{Text = "  [3/6] Detectando hardware del sistema...";              Color = "Cyan"},
-    @{Text = "  [4/6] Escaneando carpeta de instaladores...";           Color = "Cyan"},
+    @{Text = "  [4/6] Cargando enlaces de descarga...";               Color = "Cyan"},
     @{Text = "  [5/6] Buscando MAS_AIO.cmd...";                        Color = "Cyan"},
     @{Text = "  [6/6] Iniciando interfaz grafica...";                   Color = "Cyan"}
 )
@@ -123,7 +123,6 @@ $Global:ScriptDir = $null
 try { $Global:ScriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path } catch {}
 if (-not $Global:ScriptDir) { $Global:ScriptDir = (Get-Location).Path }
 
-$Global:InstaladoresDir = Join-Path $Global:ScriptDir "instaladores"
 $Global:LogFile = Join-Path $env:TEMP "SHADOWIEX_log.txt"
 
 # Icono ICO (el splash ya lo extrajo a TEMP)
@@ -1004,55 +1003,136 @@ $InstallBtn.Add_Click({
 })
 $InstallRightPanel.Controls.Add($InstallBtn)
 
-# --- INSTALADORES LOCALES ---
-$InstY = 165
-$InstallRightPanel.Controls.Add((New-SectionTitle -Text "INSTALADORES LOCALES" -X 15 -Y $InstY -W 300))
-$InstY += 28
+# --- DESCARGAS DIRECTAS: OFFICE C2R (ES-MX) + OPTIMIZER ---
+$DlY = 160
+$InstallRightPanel.Controls.Add((New-SectionTitle -Text "OFFICE C2R - ESPANOL MEXICO" -X 15 -Y $DlY -W 400))
+$DlY += 26
+$InstallRightPanel.Controls.Add((New-DescLabel -Text "Enlaces oficiales Microsoft via massgrave.dev (es-MX)" -X 15 -Y $DlY -W 460))
+$DlY += 26
 
-$InstDesc = New-DescLabel -Text "Archivos .exe de la carpeta 'instaladores'" -X 15 -Y $InstY -W 460
-$InstallRightPanel.Controls.Add($InstDesc)
-$InstY += 24
-
-$Global:InstaladoresExes = @()
-if (Test-Path $Global:InstaladoresDir) {
-    $Exes = Get-ChildItem -Path $Global:InstaladoresDir -Filter "*.exe" -EA 0 | Sort-Object Name
-    if ($Exes) {
-        foreach ($Exe in $Exes) {
-            $Global:InstaladoresExes += $Exe
-            $Card = New-Object System.Windows.Forms.Panel
-            $Card.Location = New-Object System.Drawing.Point(15, $InstY)
-            $Card.Size = New-Object System.Drawing.Size(470, 44)
-            $Card.BackColor = $Global:Theme.SurfaceLight
-            $InstallRightPanel.Controls.Add($Card)
-
-            $FileName = $Exe.Name
-            $FileSize = [math]::Round($Exe.Length / 1MB, 1)
-            $Card.Controls.Add((New-Object System.Windows.Forms.Label -Property @{
-                Text = "$FileName ($FileSize MB)"; Location = New-Object System.Drawing.Point(10, 12)
-                Size = New-Object System.Drawing.Size(330, 20); Font = $Global:Fonts.Normal; ForeColor = $Global:Theme.TextMain
-            }))
-
-            # Capture variables correctly for closure
-            $ExeFullName = $Exe.FullName
-            $ExeDisplayName = $Exe.Name
-            $RunBtn = New-Btn -Text "EJECUTAR" -X 350 -Y 6 -W 105 -H 32 -Color "Primary"
-            $RunBtn.Add_Click({
-                Update-Status "Ejecutando: $($ExeDisplayName)"
-                Start-Process $ExeFullName -Verb RunAs
-                Write-Log "Ejecutado: $ExeDisplayName"
-            }.GetNewClosure())
-            $Card.Controls.Add($RunBtn)
-            $InstY += 50
-        }
-    } else {
-        $InstallRightPanel.Controls.Add((New-DescLabel -Text "No se encontraron archivos .exe" -X 15 -Y $InstY -W 400))
-    }
-} else {
-    $InstallRightPanel.Controls.Add((New-DescLabel -Text "Carpeta 'instaladores' no encontrada" -X 15 -Y $InstY -W 400 -H 20))
-    $warnLbl = New-DescLabel -Text "Coloca los .exe junto al script en /instaladores/" -X 15 -Y ($InstY + 18) -W 400 -H 20
-    $warnLbl.ForeColor = $Global:Theme.TextDim
-    $InstallRightPanel.Controls.Add($warnLbl)
+# Datos de Office organizados por version (solo x64, los mas utiles)
+$OfficeDownloads = @{
+    "Microsoft 365" = @(
+        @{Name="Microsoft 365 Apps (ProPlus)"; PID="O365ProPlusRetail"},
+        @{Name="Microsoft 365 Business"; PID="O365BusinessRetail"},
+        @{Name="Microsoft 365 Familia"; PID="O365HomePremRetail"},
+        @{Name="Microsoft 365 Education"; PID="O365EduCloudRetail"}
+    )
+    "Office 2024" = @(
+        @{Name="Office 2024 Profesional Plus"; PID="ProPlus2024Retail"},
+        @{Name="Office 2024 Hogar"; PID="Home2024Retail"},
+        @{Name="Office 2024 Hogar y Negocio"; PID="HomeBusiness2024Retail"}
+    )
+    "Office 2021" = @(
+        @{Name="Office 2021 Profesional Plus"; PID="ProPlus2021Retail"},
+        @{Name="Office 2021 Profesional"; PID="Professional2021Retail"},
+        @{Name="Office 2021 Hogar y Estudiantes"; PID="HomeStudent2021Retail"},
+        @{Name="Office 2021 Personal"; PID="Personal2021Retail"}
+    )
+    "Office 2019" = @(
+        @{Name="Office 2019 Profesional Plus"; PID="ProPlus2019Retail"},
+        @{Name="Office 2019 Profesional"; PID="Professional2019Retail"},
+        @{Name="Office 2019 Hogar y Estudiantes"; PID="HomeStudent2019Retail"}
+    )
+    "Office 2016" = @(
+        @{Name="Office 2016 Profesional Plus"; PID="ProPlusRetail"},
+        @{Name="Office 2016 Profesional"; PID="ProfessionalRetail"},
+        @{Name="Office 2016 Hogar y Estudiantes"; PID="HomeStudentRetail"}
+    )
 }
+
+foreach ($Ver in $OfficeDownloads.Keys) {
+    # Version header
+    $VerPanel = New-Object System.Windows.Forms.Panel
+    $VerPanel.Location = New-Object System.Drawing.Point(15, $DlY)
+    $VerPanel.Size = New-Object System.Drawing.Size(470, 22)
+    $VerPanel.BackColor = $Global:Theme.Surface
+    $InstallRightPanel.Controls.Add($VerPanel)
+    $VerPanel.Controls.Add((New-Object System.Windows.Forms.Label -Property @{
+        Text = "  $Ver"; Location = New-Object System.Drawing.Point(2, 1)
+        Size = New-Object System.Drawing.Size(300, 18); Font = $Global:Fonts.Header; ForeColor = $Global:Theme.TextDim
+    }))
+    $DlY += 26
+
+    foreach ($Item in $OfficeDownloads[$Ver]) {
+        $Card = New-Object System.Windows.Forms.Panel
+        $Card.Location = New-Object System.Drawing.Point(15, $DlY)
+        $Card.Size = New-Object System.Drawing.Size(470, 36)
+        $Card.BackColor = $Global:Theme.SurfaceLight
+        $InstallRightPanel.Controls.Add($Card)
+
+        $Card.Controls.Add((New-Object System.Windows.Forms.Label -Property @{
+            Text = $Item.Name; Location = New-Object System.Drawing.Point(10, 8)
+            Size = New-Object System.Drawing.Size(280, 20); Font = $Global:Fonts.Normal; ForeColor = $Global:Theme.TextMain
+        }))
+
+        # Capturar variables para closure
+        $DL_PID = $Item.PID
+        $DL_Name = $Item.Name
+
+        $DLBtn = New-Btn -Text "DESCARGAR" -X 370 -Y 3 -W 90 -H 30 -Color "Primary"
+        $DLBtn.Add_Click({
+            $Url = "https://c2rsetup.officeapps.live.com/c2r/download.aspx?ProductreleaseID=$($DL_PID)&platform=x64&language=es-mx&version=O16GA"
+            Update-Status "Descargando $($DL_Name)..."
+            Write-Log "Descarga Office: $($DL_Name) ($($DL_PID))"
+            try {
+                $SavePath = Join-Path ([Environment]::GetFolderPath('Desktop')) "$($DL_PID)_x64_es-mx.exe"
+                [System.Net.ServicePointManager]::SecurityProtocol = [System.Net.SecurityProtocolType]::Tls12
+                $WC = New-Object System.Net.WebClient
+                $WC.DownloadFile($Url, $SavePath)
+                Update-Status "Descargado: $($DL_Name)" "success"
+                [System.Windows.Forms.MessageBox]::Show("Descarga completa:`n$SavePath", "SHADOWIEX")
+            } catch {
+                Update-Status "Error descargando $($DL_Name)" "error"
+                [System.Windows.Forms.MessageBox]::Show("Error al descargar:`n$($_.Exception.Message)", "SHADOWIEX - Error")
+            }
+        }.GetNewClosure())
+        $Card.Controls.Add($DLBtn)
+        $DlY += 42
+    }
+    $DlY += 8
+}
+
+# --- OPTIMIZER NXT ---
+$DlY += 4
+$InstallRightPanel.Controls.Add((New-Object System.Windows.Forms.Panel -Property @{
+    Location = New-Object System.Drawing.Point(15, $DlY)
+    Size = New-Object System.Drawing.Size(470, 1)
+    BackColor = $Global:Theme.Border
+}))
+$DlY += 10
+$InstallRightPanel.Controls.Add((New-SectionTitle -Text "HERRAMIENTAS EXTRAS" -X 15 -Y $DlY -W 300))
+$DlY += 28
+
+$OptCard = New-Object System.Windows.Forms.Panel
+$OptCard.Location = New-Object System.Drawing.Point(15, $DlY)
+$OptCard.Size = New-Object System.Drawing.Size(470, 44)
+$OptCard.BackColor = $Global:Theme.SurfaceLight
+$InstallRightPanel.Controls.Add($OptCard)
+$OptCard.Controls.Add((New-Object System.Windows.Forms.Label -Property @{
+    Text = "Optimizer NXT (github.com/hellzerg)"; Location = New-Object System.Drawing.Point(10, 4)
+    Size = New-Object System.Drawing.Size(320, 18); Font = $Global:Fonts.Normal; ForeColor = $Global:Theme.TextMain
+}))
+$OptCard.Controls.Add((New-DescLabel -Text "Optimizador de Windows - Limpieza y rendimiento" -X 10 -Y 24 -W 320 -H 16))
+
+$OptBtn = New-Btn -Text "DESCARGAR" -X 370 -Y 6 -W 90 -H 32 -Color "Accent"
+$OptBtn.Add_Click({
+    Update-Status "Descargando Optimizer NXT..."
+    Write-Log "Descarga: Optimizer NXT"
+    try {
+        $Url = "https://github.com/hellzerg/OptimizerNXT/releases/latest/download/optimizerNXT.exe"
+        $SavePath = Join-Path ([Environment]::GetFolderPath('Desktop')) "optimizerNXT.exe"
+        [System.Net.ServicePointManager]::SecurityProtocol = [System.Net.SecurityProtocolType]::Tls12
+        $WC = New-Object System.Net.WebClient
+        $WC.DownloadFile($Url, $SavePath)
+        Update-Status "Optimizer NXT descargado" "success"
+        [System.Windows.Forms.MessageBox]::Show("Descarga completa:`n$SavePath", "SHADOWIEX")
+    } catch {
+        Update-Status "Error descargando Optimizer NXT" "error"
+        [System.Windows.Forms.MessageBox]::Show("Error al descargar:`n$($_.Exception.Message)", "SHADOWIEX - Error")
+    }
+})
+$OptCard.Controls.Add($OptBtn)
 
 # ============================================================================
 #  ACTIVAR TAB
@@ -1135,7 +1215,7 @@ $InfoPanel.Size = New-Object System.Drawing.Size(750, 50)
 $InfoPanel.BackColor = $Global:Theme.Surface
 $ActScroll.Controls.Add($InfoPanel)
 $InfoPanel.Controls.Add((New-DescLabel -Text "HWID: Win10/11 permanente | TSforge: Todos los Windows | Ohook: Office completo" -X 15 -Y 8 -W 720 -H 16))
-$InfoPanel.Controls.Add((New-DescLabel -Text "Distribuir Shadowiex.ps1 junto con la carpeta 'instaladores' y MAS_AIO.cmd" -X 15 -Y 28 -W 720 -H 16))
+$InfoPanel.Controls.Add((New-DescLabel -Text "Distribuir Shadowiex.ps1 junto con MAS_AIO.cmd | Descargas Office directo desde Microsoft (es-MX)" -X 15 -Y 28 -W 720 -H 16))
 
 # ============================================================================
 #  OPTIMIZAR TAB
