@@ -507,15 +507,17 @@ $HeaderPanel.Controls.Add($AdminLabel)
 #  PANEL DE PESTANAS
 # ============================================================================
 $TabControl = New-Object System.Windows.Forms.TabControl
-# Usar Dock=Fill para que el TabControl ocupe todo el espacio debajo del header
-$TabControl.Dock = [System.Windows.Forms.DockStyle]::Fill
+# Usar Location + Size explicitos en lugar de Dock=Fill para evitar problemas
+# de z-order con HeaderPanel (Dock=Top) y StatusStrip (Dock=Bottom).
+# El handler Form.Resize actualizara el tamano dinamicamente.
+$TabControl.Location = New-Object System.Drawing.Point(0, 55)
+$TabControl.Size = New-Object System.Drawing.Size(1084, 633)
 $TabControl.BackColor = $Global:Theme.BG
 $TabControl.Appearance = [System.Windows.Forms.TabAppearance]::FlatButtons
 $TabControl.ItemSize = New-Object System.Drawing.Size(120, 32)
 $TabControl.Font = $Global:Fonts.Button
 $TabControl.Padding = New-Object System.Drawing.Point(10, 4)
-# Importante: agregar el TabControl ANTES del StatusStrip para que Fill no cubra el status
-# Se agregara al final despues de definir todos los paneles internos
+$TabControl.Anchor = [System.Windows.Forms.AnchorStyles]::Top -bor [System.Windows.Forms.AnchorStyles]::Bottom -bor [System.Windows.Forms.AnchorStyles]::Left -bor [System.Windows.Forms.AnchorStyles]::Right
 
 $TabDiag    = New-Object System.Windows.Forms.TabPage; $TabDiag.Text = "DIAGNOSTICO";  $TabDiag.BackColor = $Global:Theme.BG; $TabDiag.Padding = New-Object System.Windows.Forms.Padding(20)
 $TabRepair  = New-Object System.Windows.Forms.TabPage; $TabRepair.Text = "REPARAR";     $TabRepair.BackColor = $Global:Theme.BG; $TabRepair.Padding = New-Object System.Windows.Forms.Padding(20)
@@ -525,7 +527,8 @@ $TabTweaks  = New-Object System.Windows.Forms.TabPage; $TabTweaks.Text = "OPTIMI
 $TabConfig  = New-Object System.Windows.Forms.TabPage; $TabConfig.Text = "CONFIG";       $TabConfig.BackColor = $Global:Theme.BG; $TabConfig.Padding = New-Object System.Windows.Forms.Padding(20)
 
 $TabControl.Controls.AddRange(@($TabDiag, $TabRepair, $TabInstall, $TabAct, $TabTweaks, $TabConfig))
-# NOTA: el TabControl se agregara al Form despues del StatusStrip para que el Dock=Fill respete el status bar
+# Agregar el TabControl al Form inmediatamente despues de crear el HeaderPanel
+$Global:Form.Controls.Add($TabControl)
 
 # ============================================================================
 #  DIAGNOSTICO TAB
@@ -2130,31 +2133,36 @@ $MASStatusBar = New-Object System.Windows.Forms.ToolStripStatusLabel
 $MASStatusBar.Text = "  MAS: $(if($masFound){'OK'}else{'--'})"; $MASStatusBar.ForeColor = if($masFound){$Global:Theme.Success}else{$Global:Theme.Warning}
 $StatusStrip.Items.Add($MASStatusBar)
 
-# Agregar el StatusStrip ANTES del TabControl para que Dock=Fill del TabControl
-# no tape la barra de estado (el orden de Add con Dock importa: Top/Bottom primero, Fill al ultimo)
+# Agregar el StatusStrip al Form (Dock=Bottom)
 $StatusStrip.Dock = [System.Windows.Forms.DockStyle]::Bottom
 $Global:Form.Controls.Add($StatusStrip)
-# Ahora si agregar el TabControl con Dock=Fill - ocupara todo el espacio entre header y status
-$Global:Form.Controls.Add($TabControl)
+# NOTA: el TabControl ya fue agregado al Form antes, justo despues de crear el HeaderPanel.
+# El orden de controles en Form es: HeaderPanel (index 0), TabControl (index 1), StatusStrip (index 2)
+# Esto asegura que el TabControl sea visible entre el header y el status bar.
 
 # ============================================================================
-#  HANDLER DE RESIZE - Reajustar elementos con posiciones absolutas
+#  HANDLER DE RESIZE - Reajustar el TabControl al cambiar el tamano de la ventana
 # ============================================================================
-# Los paneles con Dock=Fill/Top/Bottom se ajustan solos, pero algunos labels
-# del header y cards de OPTIMIZAR tienen posiciones absolutas que necesitan
-# reacomodo al cambiar el tamano de la ventana.
 $Global:Form.Add_Resize({
     try {
-        # El header usa Dock=Top y sus labels ya estan anclados (Anchor)
-        # con Top+Right, asi que se reposicionan automaticamente.
+        # El HeaderPanel tiene altura fija de 55px (Dock=Top)
+        # El StatusStrip tiene altura variable (~22px, Dock=Bottom)
+        # El TabControl debe llenar el espacio entre ambos
+        $statusH = if ($StatusStrip) { $StatusStrip.Height } else { 22 }
+        $newW = $Global:Form.ClientRectangle.Width
+        $newH = $Global:Form.ClientRectangle.Height - 55 - $statusH
+        if ($newH -lt 100) { $newH = 100 }
+        if ($newW -lt 200) { $newW = 200 }
+        $TabControl.Location = New-Object System.Drawing.Point(0, 55)
+        $TabControl.Size = New-Object System.Drawing.Size($newW, $newH)
         if ($HeaderPanel) { $HeaderPanel.Invalidate() }
-        # TableLayoutPanel y todos los paneles con Dock=Fill se ajustan automaticamente.
     } catch {}
 })
 
 # Evento Shown: forzar repintado cuando la ventana ya esta visible
 $Global:Form.Add_Shown({
     try {
+        # Disparar manualmente el resize para posicionar el TabControl correctamente
         $Global:Form.Refresh()
     } catch {}
 })
