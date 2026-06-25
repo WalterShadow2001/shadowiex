@@ -1521,6 +1521,41 @@ $AVSectionY = if ($TCol -eq 0) { $TweakY } else { $TweakY + 98 }
 $AVSectionY += 15
 $TweakScroll.Controls.Add((New-SectionTitle -Text "REMOVER ANTIVIRUS (DESINSTALACION FORZADA)" -X 15 -Y $AVSectionY))
 
+# --- Helper interno: descarga robusta con HttpClient (maneja redirecciones, TLS 1.2/1.3, timeouts) ---
+function Invoke-SafeDownload {
+    param(
+        [Parameter(Mandatory=$true)][string]$Url,
+        [Parameter(Mandatory=$true)][string]$Destination,
+        [int]$MinSizeKB = 100,
+        [int]$TimeoutSec = 60
+    )
+    # Forzar TLS 1.2 y 1.3 (puede que algunos hosts solo soporten 1.2)
+    try { [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12 -bor [Net.SecurityProtocolType]::Tls13 } catch { [Net.ServicePointManager]::SecurityProtocol = 3072 }
+    if (Test-Path $Destination) { Remove-Item -Force $Destination -EA 0 }
+    # Usar HttpClient para mejor manejo de redirecciones y UA
+    Add-Type -AssemblyName System.Net.Http -EA 0
+    $handler = New-Object System.Net.Http.HttpClientHandler
+    $handler.AllowAutoRedirect = $true
+    $handler.AutomaticDecompression = [System.Net.DecompressionMethods]::GZip -bor [System.Net.DecompressionMethods]::Deflate
+    $client = New-Object System.Net.Http.HttpClient($handler)
+    $client.Timeout = [TimeSpan]::FromSeconds($TimeoutSec)
+    $client.DefaultRequestHeaders.Add("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) SHADOWIEX/15.0")
+    try {
+        $resp = $client.GetAsync($Url).Result
+        if (-not $resp.IsSuccessStatusCode) { throw "HTTP $([int]$resp.StatusCode) $($resp.StatusCode)" }
+        $stream = $resp.Content.ReadAsStreamAsync().Result
+        $fs = [System.IO.File]::Create($Destination)
+        $stream.CopyTo($fs)
+        $fs.Close(); $stream.Close()
+        if ((-not (Test-Path $Destination)) -or (Get-Item $Destination).Length -lt ($MinSizeKB * 1KB)) {
+            throw "archivo descargado demasiado pequeno o inexistente"
+        }
+        return $true
+    } finally {
+        $client.Dispose(); $handler.Dispose()
+    }
+}
+
 $AVTools = @(
     @{Name="AVAST CLEAR"; Desc="Desinstalacion forzada de Avast (Modo Seguro recomendado)"; Color="Danger"; Action={
         $R = [System.Windows.Forms.MessageBox]::Show(
@@ -1530,18 +1565,13 @@ $AVTools = @(
             Update-Status "Descargando Avast Clear..."
             $avDest = Join-Path $env:TEMP "SHADOWIEX_avast_clear.exe"
             try {
-                if (Test-Path $avDest) { Remove-Item -Force $avDest }
-                [Net.ServicePointManager]::SecurityProtocol = 3072
-                # URL oficial desde la pagina de soporte de Avast
-                (New-Object System.Net.WebClient).DownloadFile("https://honzik.avcdn.net/setup/avast-av/release/avast_av_clear.exe", $avDest)
-                if ((Test-Path $avDest) -and (Get-Item $avDest).Length -gt 100KB) {
-                    Update-Status "Avast Clear descargado - ejecutando..." "success"; Write-Log "Avast Clear ejecutado"
-                    Start-Process $avDest -Verb RunAs
-                } else { throw "descarga incompleta" }
+                Invoke-SafeDownload -Url "https://files.avcdn.net/setup/avast-av/release/avast_av_clear.exe" -Destination $avDest -MinSizeKB 500
+                Update-Status "Avast Clear descargado - ejecutando..." "success"; Write-Log "Avast Clear ejecutado"
+                Start-Process $avDest -Verb RunAs
             } catch {
                 Update-Status "Descarga directa fallida - abriendo pagina oficial..." "warning"
-                if (Test-Path $avDest) { Remove-Item -Force $avDest }
-                Write-Log "Avast Clear fallback a pagina oficial"
+                if (Test-Path $avDest) { Remove-Item -Force $avDest -EA 0 }
+                Write-Log "Avast Clear fallback a pagina oficial: $_"
                 Start-Process "https://www.avast.com/en-us/uninstall-utility"
             }
         }
@@ -1554,18 +1584,15 @@ $AVTools = @(
             Update-Status "Descargando AVG Clear..."
             $avgDest = Join-Path $env:TEMP "SHADOWIEX_avg_clear.exe"
             try {
-                if (Test-Path $avgDest) { Remove-Item -Force $avgDest }
-                [Net.ServicePointManager]::SecurityProtocol = 3072
-                (New-Object System.Net.WebClient).DownloadFile("https://honzik.avcdn.net/setup/avast-av/release/avast_av_clear.exe", $avgDest)
-                if ((Test-Path $avgDest) -and (Get-Item $avgDest).Length -gt 100KB) {
-                    Update-Status "AVG Clear descargado - ejecutando..." "success"; Write-Log "AVG Clear ejecutado"
-                    Start-Process $avgDest -Verb RunAs
-                } else { throw "descarga incompleta" }
+                # AVG Clear usa el mismo motor que Avast Clear (misma familia) pero URL distinta
+                Invoke-SafeDownload -Url "https://files.avgcdn.net/setup/avg-av/release/avg_av_clear.exe" -Destination $avgDest -MinSizeKB 500
+                Update-Status "AVG Clear descargado - ejecutando..." "success"; Write-Log "AVG Clear ejecutado"
+                Start-Process $avgDest -Verb RunAs
             } catch {
                 Update-Status "Descarga directa fallida - abriendo pagina oficial..." "warning"
-                if (Test-Path $avgDest) { Remove-Item -Force $avgDest }
-                Write-Log "AVG Clear fallback a pagina oficial"
-                Start-Process "https://support.avg.com/SupportArticle/virus-removal-tool"
+                if (Test-Path $avgDest) { Remove-Item -Force $avgDest -EA 0 }
+                Write-Log "AVG Clear fallback a pagina oficial: $_"
+                Start-Process "https://www.avg.com/en-ww/avg-removal-tool"
             }
         }
     }},
@@ -1577,17 +1604,13 @@ $AVTools = @(
             Update-Status "Descargando McAfee MCPR..."
             $mcDest = Join-Path $env:TEMP "SHADOWIEX_MCPR.exe"
             try {
-                if (Test-Path $mcDest) { Remove-Item -Force $mcDest }
-                [Net.ServicePointManager]::SecurityProtocol = 3072
-                (New-Object System.Net.WebClient).DownloadFile("https://download.mcafee.com/molbin/aff/landingpages/mcpr/MCPR.exe", $mcDest)
-                if ((Test-Path $mcDest) -and (Get-Item $mcDest).Length -gt 100KB) {
-                    Update-Status "McAfee MCPR descargado - ejecutando..." "success"; Write-Log "McAfee MCPR ejecutado"
-                    Start-Process $mcDest -Verb RunAs
-                } else { throw "descarga incompleta" }
+                Invoke-SafeDownload -Url "https://download.mcafee.com/molbin/iss-loc/SupportTools/MCPR/MCPR.exe" -Destination $mcDest -MinSizeKB 1000
+                Update-Status "McAfee MCPR descargado - ejecutando..." "success"; Write-Log "McAfee MCPR ejecutado"
+                Start-Process $mcDest -Verb RunAs
             } catch {
                 Update-Status "Descarga directa fallida - abriendo pagina oficial..." "warning"
-                if (Test-Path $mcDest) { Remove-Item -Force $mcDest }
-                Write-Log "McAfee MCPR fallback a pagina oficial"
+                if (Test-Path $mcDest) { Remove-Item -Force $mcDest -EA 0 }
+                Write-Log "McAfee MCPR fallback a pagina oficial: $_"
                 Start-Process "https://service.mcafee.com/webcenter/portal/McAfee/article/TS101331"
             }
         }
@@ -1600,17 +1623,13 @@ $AVTools = @(
             Update-Status "Descargando Kaspersky kavremover..."
             $ksDest = Join-Path $env:TEMP "SHADOWIEX_kavremover.exe"
             try {
-                if (Test-Path $ksDest) { Remove-Item -Force $ksDest }
-                [Net.ServicePointManager]::SecurityProtocol = 3072
-                (New-Object System.Net.WebClient).DownloadFile("https://media.kaspersky.com/utilities/VirusUtilities/EN/kavremover.exe", $ksDest)
-                if ((Test-Path $ksDest) -and (Get-Item $ksDest).Length -gt 100KB) {
-                    Update-Status "Kaspersky kavremover descargado - ejecutando..." "success"; Write-Log "Kaspersky kavremover ejecutado"
-                    Start-Process $ksDest -Verb RunAs
-                } else { throw "descarga incompleta" }
+                Invoke-SafeDownload -Url "https://media.kaspersky.com/utilities/VirusUtilities/EN/kavremover.exe" -Destination $ksDest -MinSizeKB 500
+                Update-Status "Kaspersky kavremover descargado - ejecutando..." "success"; Write-Log "Kaspersky kavremover ejecutado"
+                Start-Process $ksDest -Verb RunAs
             } catch {
                 Update-Status "Descarga directa fallida - abriendo pagina oficial..." "warning"
-                if (Test-Path $ksDest) { Remove-Item -Force $ksDest }
-                Write-Log "Kaspersky kavremover fallback a pagina oficial"
+                if (Test-Path $ksDest) { Remove-Item -Force $ksDest -EA 0 }
+                Write-Log "Kaspersky kavremover fallback a pagina oficial: $_"
                 Start-Process "https://support.kaspersky.com/common/uninstall/1464"
             }
         }
@@ -1623,17 +1642,13 @@ $AVTools = @(
             Update-Status "Descargando Norton Remove..."
             $nrDest = Join-Path $env:TEMP "SHADOWIEX_Norton_Removal.exe"
             try {
-                if (Test-Path $nrDest) { Remove-Item -Force $nrDest }
-                [Net.ServicePointManager]::SecurityProtocol = 3072
-                (New-Object System.Net.WebClient).DownloadFile("https://service.symantec.com/EXTERNAL/fresh/dispatch-main/v1/asset/nrntool/latest", $nrDest)
-                if ((Test-Path $nrDest) -and (Get-Item $nrDest).Length -gt 100KB) {
-                    Update-Status "Norton Remove descargado - ejecutando..." "success"; Write-Log "Norton Remove ejecutado"
-                    Start-Process $nrDest -Verb RunAs
-                } else { throw "descarga incompleta" }
+                Invoke-SafeDownload -Url "https://nrt-east.symantec.com/NRT/NRT.exe" -Destination $nrDest -MinSizeKB 1000
+                Update-Status "Norton Remove descargado - ejecutando..." "success"; Write-Log "Norton Remove ejecutado"
+                Start-Process $nrDest -Verb RunAs
             } catch {
                 Update-Status "Descarga directa fallida - abriendo pagina oficial..." "warning"
-                if (Test-Path $nrDest) { Remove-Item -Force $nrDest }
-                Write-Log "Norton Remove fallback a pagina oficial"
+                if (Test-Path $nrDest) { Remove-Item -Force $nrDest -EA 0 }
+                Write-Log "Norton Remove fallback a pagina oficial: $_"
                 Start-Process "https://support.norton.com/sp/en/us/home/current/solutions/v93402178_EndUserProfile_en_us"
             }
         }
@@ -1646,17 +1661,14 @@ $AVTools = @(
             Update-Status "Descargando ESET Uninstaller..."
             $esDest = Join-Path $env:TEMP "SHADOWIEX_ESET_Uninstaller.exe"
             try {
-                if (Test-Path $esDest) { Remove-Item -Force $esDest }
-                [Net.ServicePointManager]::SecurityProtocol = 3072
-                (New-Object System.Net.WebClient).DownloadFile("https://download.eset.com/com/eset/tools/uninstaller/ESETUninstaller.exe", $esDest)
-                if ((Test-Path $esDest) -and (Get-Item $esDest).Length -gt 100KB) {
-                    Update-Status "ESET Uninstaller descargado - ejecutando..." "success"; Write-Log "ESET Uninstaller ejecutado"
-                    Start-Process $esDest -Verb RunAs
-                } else { throw "descarga incompleta" }
+                Invoke-SafeDownload -Url "https://download.eset.com/com/eset/tools/uninstaller/ESETUninstaller.exe" -Destination $esDest -MinSizeKB 500
+                Update-Status "ESET Uninstaller descargado - ejecutando..." "success"; Write-Log "ESET Uninstaller ejecutado"
+                # ESET Uninstaller requiere indicar explicitamente la aceptacion de ejecucion en modo seguro
+                Start-Process $esDest -Verb RunAs
             } catch {
                 Update-Status "Descarga directa fallida - abriendo pagina oficial..." "warning"
-                if (Test-Path $esDest) { Remove-Item -Force $esDest }
-                Write-Log "ESET Uninstaller fallback a pagina oficial"
+                if (Test-Path $esDest) { Remove-Item -Force $esDest -EA 0 }
+                Write-Log "ESET Uninstaller fallback a pagina oficial: $_"
                 Start-Process "https://support.eset.com/en/kb141/install-eset-uninstaller-tool"
             }
         }
@@ -1704,27 +1716,29 @@ Write-Host "========================================" -ForegroundColor Cyan
 Write-Host ""
 
 # --- PASO 1: Cerrar procesos de Office ---
-Write-Host "[1/7] Cerrando procesos de Office..." -ForegroundColor Yellow
+# Nota: MSMPENG/MSASCUI/SECHEALTH pertenecen a Windows Defender y NO deben cerrarse
+Write-Host "[1/8] Cerrando procesos de Office..." -ForegroundColor Yellow
 $officeProcs = @("WINWORD","EXCEL","OUTLOOK","POWERPNT","MSACCESS","ONENOTE","MSPUB","MSQUERY",
                  "LYNC","SKYPE","TEAMS","CLICKTORUN","OFFICETELEMETRY","MSOSYNC","GROOVE",
-                 "ONEDRIVE","WINPROJ","VISIO","MSMPENG","MSASCUI","SECHEALTH")
+                 "ONEDRIVE","WINPROJ","VISIO","BCREDITIALUI","SEARCHPROTOCOLHOST","SEARCHFILTERHOST",
+                 "CLVIEW","DCF","EXCEL.EXE","MSOUCAF","OIS","MOC")
 $killed = 0
-$officeProcs | ForEach-Object {
+$officeProcs | Sort-Object -Unique | ForEach-Object {
     try { $p = Get-Process -Name $_ -EA 0; if ($p) { Stop-Process -Name $_ -Force -EA 0; $killed++ } } catch {}
 }
 Start-Sleep -Seconds 2
 Write-Host "  Procesos cerrados: $killed" -ForegroundColor Gray
 
 # --- PASO 2: Detener servicios de Office ---
-Write-Host "[2/7] Deteniendo servicios de Office..." -ForegroundColor Yellow
-$officeSvcs = @("ClickToRunSvc","osppsvc","OfficeSvc","ose64","ose")
+Write-Host "[2/8] Deteniendo servicios de Office..." -ForegroundColor Yellow
+$officeSvcs = @("ClickToRunSvc","osppsvc","OfficeSvc","ose64","ose","OfficeTelemetryAgentLogon","OfficeTelemetryAgentSysprep")
 $officeSvcs | ForEach-Object {
     try { Stop-Service -Name $_ -Force -EA 0; Set-Service -Name $_ -StartupType Disabled -EA 0 } catch {}
 }
 Start-Sleep -Seconds 1
 
 # --- PASO 3: Desinstalar Office ClickToRun ---
-Write-Host "[3/7] Desinstalando Office ClickToRun..." -ForegroundColor Yellow
+Write-Host "[3/8] Desinstalando Office ClickToRun..." -ForegroundColor Yellow
 $ctrExe = "$env:CommonProgramFiles\Microsoft Shared\ClickToRun\OfficeClickToRun.exe"
 if (Test-Path $ctrExe) {
     Write-Host "  C2R detectado: $ctrExe" -ForegroundColor Gray
@@ -1733,23 +1747,24 @@ if (Test-Path $ctrExe) {
         Start-Sleep -Seconds 2
         # Leer productos instalados
         $regPath = "HKLM:\SOFTWARE\Microsoft\Office\ClickToRun\Configuration"
+        $products = $null
         if (Test-Path $regPath) {
             $products = (Get-ItemProperty $regPath -EA 0).ProductReleaseIds
-            if ($products) {
-                Write-Host "  Productos C2R: $products" -ForegroundColor Gray
-            }
+            if ($products) { Write-Host "  Productos C2R: $products" -ForegroundColor Gray }
         }
-        # Ejecutar desinstalacion C2R
-        $proc = Start-Process $ctrExe -ArgumentList "scenario=install scenariosubtype=uninstall level=1" -Wait -PassThru -EA 0
-        if ($proc.ExitCode -eq 0) { Write-Host "  C2R desinstalado correctamente" -ForegroundColor Green }
-        else { Write-Host "  C2R proceso terminado (codigo: $($proc.ExitCode))" -ForegroundColor DarkYellow }
+        # Ejecutar desinstalacion C2R - incluir products y displaylevel para evitar colgar en modo silencioso
+        $args = @("scenario=install","scenariosubtype=uninstall","level=1","displaylevel=true")
+        if ($products) { $args += "products=$products" }
+        $proc = Start-Process $ctrExe -ArgumentList $args -Wait -PassThru -EA 0
+        if ($proc -and $proc.ExitCode -eq 0) { Write-Host "  C2R desinstalado correctamente" -ForegroundColor Green }
+        elseif ($proc) { Write-Host "  C2R proceso terminado (codigo: $($proc.ExitCode))" -ForegroundColor DarkYellow }
     } catch { Write-Host "  Error desinstalando C2R: $_" -ForegroundColor Red }
 } else {
     Write-Host "  ClickToRun no encontrado" -ForegroundColor Gray
 }
 
 # --- PASO 4: Desinstalar Office MSI ---
-Write-Host "[4/7] Buscando instalaciones Office MSI..." -ForegroundColor Yellow
+Write-Host "[4/8] Buscando instalaciones Office MSI..." -ForegroundColor Yellow
 $uninstallPaths = @(
     "HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\*",
     "HKLM:\SOFTWARE\WOW6432Node\Microsoft\Windows\CurrentVersion\Uninstall\*"
@@ -1757,7 +1772,7 @@ $uninstallPaths = @(
 $msiCount = 0
 $uninstallPaths | ForEach-Object {
     Get-ItemProperty $_ -EA 0 | Where-Object {
-        $_.DisplayName -match "Microsoft Office" -and $_.DisplayName -notmatch "Viewer|Compatibility|Update|Shared"
+        $_.DisplayName -match "Microsoft Office" -and $_.DisplayName -notmatch "Viewer|Compatibility|Update|Shared|Proof|FileFormat"
     } | ForEach-Object {
         $name = $_.DisplayName
         $uninstallStr = $_.UninstallString
@@ -1786,21 +1801,44 @@ $uninstallPaths | ForEach-Object {
 if ($msiCount -eq 0) { Write-Host "  No se encontraron instalaciones MSI" -ForegroundColor Gray }
 
 # --- PASO 5: Limpiar registros de Office ---
-Write-Host "[5/7] Limpiando registros de Office..." -ForegroundColor Yellow
+# NUEVO PASO 5: Tareas programadas de Office (Telemetry, Background Task)
+Write-Host "[5/8] Limpiando tareas programadas y registros de Office..." -ForegroundColor Yellow
+# 5a. Tareas programadas de Office (no se eliminaban en version anterior)
+$officeTasks = @(
+    "\\Microsoft\\Office\\OfficeTelemetryAgentFallBack",
+    "\\Microsoft\\Office\\OfficeTelemetryAgentLogon",
+    "\\Microsoft\\Office\\Office 15 Subscription Heartbeat",
+    "\\Microsoft\\Office\\OfficeBackgroundTaskHandlerRegistration",
+    "\\Microsoft\\Office\\OfficeBackgroundTaskHandlerLogon"
+)
+$tasksRemoved = 0
+foreach ($t in $officeTasks) {
+    try { schtasks /Delete /TN $t /F 2>$null | Out-Null; if ($LASTEXITCODE -eq 0) { $tasksRemoved++ } } catch {}
+}
+Write-Host "  Tareas programadas Office eliminadas: $tasksRemoved" -ForegroundColor Gray
+
+# 5b. Registros especificos de Office (NO borrar la rama completa Uninstall\*)
 $regKeys = @(
     "HKLM:\SOFTWARE\Microsoft\Office",
     "HKLM:\SOFTWARE\WOW6432Node\Microsoft\Office",
     "HKCU:\SOFTWARE\Microsoft\Office",
     "HKLM:\SOFTWARE\Microsoft\Office\ClickToRun",
-    "HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\*"
+    "HKLM:\SOFTWARE\Microsoft\Office\16.0",
+    "HKLM:\SOFTWARE\Microsoft\Office\15.0",
+    "HKCU:\SOFTWARE\Microsoft\Office\16.0",
+    "HKCU:\SOFTWARE\Microsoft\Office\15.0",
+    "HKLM:\SOFTWARE\Microsoft\AppVISV",
+    "HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\O365BusinessRetail - es-mx",
+    "HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\O365HomePremRetail - es-mx",
+    "HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\ProPlusRetail - es-mx"
 )
 $regCleaned = 0
 foreach ($rk in $regKeys) {
     try { Remove-Item -Path $rk -Recurse -Force -EA 0; $regCleaned++ } catch {}
 }
-# Limpiar entradas especificas de Office en Uninstall
+# Limpiar SOLAMENTE entradas especificas de Office en Uninstall (no toda la rama)
 $uninstallPaths | ForEach-Object {
-    Get-ItemProperty $_ -EA 0 | Where-Object { $_.DisplayName -match "Microsoft Office" } | ForEach-Object {
+    Get-ItemProperty $_ -EA 0 | Where-Object { $_.DisplayName -match "Microsoft Office|Office 365|Microsoft 365" } | ForEach-Object {
         $keyPath = $_.PSPath
         try { Remove-Item -Path $keyPath -Recurse -Force -EA 0; $regCleaned++ } catch {}
     }
@@ -1808,7 +1846,7 @@ $uninstallPaths | ForEach-Object {
 Write-Host "  Registros limpiados: $regCleaned" -ForegroundColor Gray
 
 # --- PASO 6: Limpiar archivos residuales ---
-Write-Host "[6/7] Eliminando archivos residuales..." -ForegroundColor Yellow
+Write-Host "[6/8] Eliminando archivos residuales..." -ForegroundColor Yellow
 $folders = @(
     "$env:ProgramFiles\Microsoft Office",
     "${env:ProgramFiles(x86)}\Microsoft Office",
@@ -1842,7 +1880,18 @@ foreach ($f in $folders) {
 $freedMB = [math]::Round($sizeFreed / 1MB, 1)
 Write-Host "  Carpetas eliminadas: $folderCount (~$freedMB MB)" -ForegroundColor Gray
 
-# --- PASO 7: Resumen ---
+# --- PASO 7: Verificacion final y resumen ---
+Write-Host ""
+Write-Host "[7/8] Verificando limpieza..." -ForegroundColor Yellow
+$remainingOffice = Get-ItemProperty "HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\*","HKLM:\SOFTWARE\WOW6432Node\Microsoft\Windows\CurrentVersion\Uninstall\*" -EA 0 | Where-Object { $_.DisplayName -match "Microsoft Office|Office 365" }
+if ($remainingOffice) {
+    Write-Host "  ADVERTENCIA: Aun quedan entradas de Office en Uninstall:" -ForegroundColor DarkYellow
+    $remainingOffice | ForEach-Object { Write-Host "    - $($_.DisplayName)" -ForegroundColor DarkYellow }
+} else {
+    Write-Host "  OK: No se detectaron instalaciones Office residuales" -ForegroundColor Green
+}
+
+# --- PASO 8: Resumen ---
 Write-Host ""
 Write-Host "========================================" -ForegroundColor Cyan
 Write-Host "  LIMPIEZA COMPLETADA" -ForegroundColor Green
@@ -1850,6 +1899,7 @@ Write-Host "========================================" -ForegroundColor Cyan
 Write-Host ""
 Write-Host "  Procesos cerrados:    $killed" -ForegroundColor White
 Write-Host "  Instalaciones MSI:    $msiCount" -ForegroundColor White
+Write-Host "  Tareas Office:        $tasksRemoved" -ForegroundColor White
 Write-Host "  Registros limpiados:  $regCleaned" -ForegroundColor White
 Write-Host "  Carpetas eliminadas:  $folderCount (~$freedMB MB)" -ForegroundColor White
 Write-Host ""
@@ -1858,7 +1908,9 @@ Write-Host ""
 Read-Host "Presiona Enter para cerrar"
 '@
             $scriptPath = Join-Path $env:TEMP "SHADOWIEX_OfficeForceClean.ps1"
-            $scriptContent | Out-File $scriptPath -Encoding UTF8 -Force
+            # UTF-8 sin BOM para evitar problemas de parseo en PowerShell 5.1
+            $utf8NoBom = New-Object System.Text.UTF8Encoding $false
+            [System.IO.File]::WriteAllText($scriptPath, $scriptContent, $utf8NoBom)
             Update-Status "Ejecutando Office Force Clean..." "success"
             Write-Log "Office Force Clean ejecutado"
             Start-Process powershell.exe -ArgumentList "-NoProfile -ExecutionPolicy Bypass -File `"$scriptPath`"" -Verb RunAs
