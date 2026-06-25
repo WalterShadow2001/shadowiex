@@ -429,6 +429,9 @@ $Global:Form.StartPosition = "CenterScreen"
 $Global:Form.BackColor = $Global:Theme.BG
 $Global:Form.ForeColor = $Global:Theme.TextMain
 $Global:Form.MinimumSize = New-Object System.Drawing.Size(950, 650)
+# Permitir maximizar y redimensionar libremente
+$Global:Form.MaximizeBox = $true
+$Global:Form.AutoScroll = $false
 try {
     if ($Global:IconPath -and (Test-Path $Global:IconPath)) {
         $Global:Form.Icon = New-Object System.Drawing.Icon($Global:IconPath)
@@ -442,6 +445,7 @@ $HeaderPanel = New-Object System.Windows.Forms.Panel
 $HeaderPanel.Dock = [System.Windows.Forms.DockStyle]::Top
 $HeaderPanel.Height = 55
 $HeaderPanel.BackColor = $Global:Theme.Surface
+# El header se redimensiona automaticamente con Dock=Top
 $Global:Form.Controls.Add($HeaderPanel)
 
 # Logo PNG in header
@@ -450,6 +454,7 @@ $LogoPB.Location = New-Object System.Drawing.Point(15, 10)
 $LogoPB.Size = New-Object System.Drawing.Size(40, 40)
 $LogoPB.SizeMode = [System.Windows.Forms.PictureBoxSizeMode]::Zoom
 $LogoPB.BackColor = [System.Drawing.Color]::Transparent
+$LogoPB.Anchor = [System.Windows.Forms.AnchorStyles]::Top -bor [System.Windows.Forms.AnchorStyles]::Left
 try {
     if ($Global:LogoPath -and (Test-Path $Global:LogoPath)) {
         $LogoPB.Image = New-Object System.Drawing.Bitmap($Global:LogoPath)
@@ -463,6 +468,7 @@ $TitleLabel.Location = New-Object System.Drawing.Point(62, 12)
 $TitleLabel.Size = New-Object System.Drawing.Size(180, 36)
 $TitleLabel.Font = $Global:Fonts.Title
 $TitleLabel.ForeColor = $Global:Theme.TextMain
+$TitleLabel.Anchor = [System.Windows.Forms.AnchorStyles]::Top -bor [System.Windows.Forms.AnchorStyles]::Left
 $HeaderPanel.Controls.Add($TitleLabel)
 
 $VersionLabel = New-Object System.Windows.Forms.Label
@@ -471,16 +477,20 @@ $VersionLabel.Location = New-Object System.Drawing.Point(230, 25)
 $VersionLabel.Size = New-Object System.Drawing.Size(130, 18)
 $VersionLabel.Font = $Global:Fonts.Small
 $VersionLabel.ForeColor = $Global:Theme.TextDim
+$VersionLabel.Anchor = [System.Windows.Forms.AnchorStyles]::Top -bor [System.Windows.Forms.AnchorStyles]::Left
 $HeaderPanel.Controls.Add($VersionLabel)
 
 $OSInfo = (Get-CimInstance Win32_OperatingSystem).Caption
 $SysLabel = New-Object System.Windows.Forms.Label
 $SysLabel.Text = $OSInfo
+# Posicion inicial; el handler de Resize reposiciona al borde derecho
 $SysLabel.Location = New-Object System.Drawing.Point(780, 10)
 $SysLabel.Size = New-Object System.Drawing.Size(300, 18)
 $SysLabel.Font = $Global:Fonts.Small
 $SysLabel.ForeColor = $Global:Theme.TextDim
 $SysLabel.TextAlign = [System.Drawing.ContentAlignment]::TopRight
+# Anclar a Top+Right para que se mueva con el borde derecho de la ventana
+$SysLabel.Anchor = [System.Windows.Forms.AnchorStyles]::Top -bor [System.Windows.Forms.AnchorStyles]::Right
 $HeaderPanel.Controls.Add($SysLabel)
 
 $AdminLabel = New-Object System.Windows.Forms.Label
@@ -490,19 +500,22 @@ $AdminLabel.Size = New-Object System.Drawing.Size(100, 18)
 $AdminLabel.Font = $Global:Fonts.Small
 $AdminLabel.ForeColor = $Global:Theme.Success
 $AdminLabel.TextAlign = [System.Drawing.ContentAlignment]::TopRight
+$AdminLabel.Anchor = [System.Windows.Forms.AnchorStyles]::Top -bor [System.Windows.Forms.AnchorStyles]::Right
 $HeaderPanel.Controls.Add($AdminLabel)
 
 # ============================================================================
 #  PANEL DE PESTANAS
 # ============================================================================
 $TabControl = New-Object System.Windows.Forms.TabControl
-$TabControl.Location = New-Object System.Drawing.Point(0, 55)
-$TabControl.Size = New-Object System.Drawing.Size(1100, 645)
+# Usar Dock=Fill para que el TabControl ocupe todo el espacio debajo del header
+$TabControl.Dock = [System.Windows.Forms.DockStyle]::Fill
 $TabControl.BackColor = $Global:Theme.BG
 $TabControl.Appearance = [System.Windows.Forms.TabAppearance]::FlatButtons
 $TabControl.ItemSize = New-Object System.Drawing.Size(120, 32)
 $TabControl.Font = $Global:Fonts.Button
 $TabControl.Padding = New-Object System.Drawing.Point(10, 4)
+# Importante: agregar el TabControl ANTES del StatusStrip para que Fill no cubra el status
+# Se agregara al final despues de definir todos los paneles internos
 
 $TabDiag    = New-Object System.Windows.Forms.TabPage; $TabDiag.Text = "DIAGNOSTICO";  $TabDiag.BackColor = $Global:Theme.BG; $TabDiag.Padding = New-Object System.Windows.Forms.Padding(20)
 $TabRepair  = New-Object System.Windows.Forms.TabPage; $TabRepair.Text = "REPARAR";     $TabRepair.BackColor = $Global:Theme.BG; $TabRepair.Padding = New-Object System.Windows.Forms.Padding(20)
@@ -512,7 +525,7 @@ $TabTweaks  = New-Object System.Windows.Forms.TabPage; $TabTweaks.Text = "OPTIMI
 $TabConfig  = New-Object System.Windows.Forms.TabPage; $TabConfig.Text = "CONFIG";       $TabConfig.BackColor = $Global:Theme.BG; $TabConfig.Padding = New-Object System.Windows.Forms.Padding(20)
 
 $TabControl.Controls.AddRange(@($TabDiag, $TabRepair, $TabInstall, $TabAct, $TabTweaks, $TabConfig))
-$Global:Form.Controls.Add($TabControl)
+# NOTA: el TabControl se agregara al Form despues del StatusStrip para que el Dock=Fill respete el status bar
 
 # ============================================================================
 #  DIAGNOSTICO TAB
@@ -864,12 +877,24 @@ foreach ($Tool in $RepairTools) {
 # ============================================================================
 #  INSTALAR TAB
 # ============================================================================
+# Usar un SplitContainer para que el panel izquierdo y derecho se redimensionen
+# proporcionalmente al cambiar el tamano de la ventana.
+$InstallSplit = New-Object System.Windows.Forms.SplitContainer
+$InstallSplit.Dock = [System.Windows.Forms.DockStyle]::Fill
+$InstallSplit.BackColor = $Global:Theme.BG
+# Panel1 (izq) ~52%, Panel2 (der) ~48% - ratio fijo pero se estira con la ventana
+$InstallSplit.SplitterDistance = 560
+$InstallSplit.Panel1MinSize = 400
+$InstallSplit.Panel2MinSize = 350
+$InstallSplit.FixedPanel = [System.Windows.Forms.FixedPanel]::None
+$InstallSplit.SplitterWidth = 5
+$TabInstall.Controls.Add($InstallSplit)
+
 $InstallLeftPanel = New-Object System.Windows.Forms.Panel
-$InstallLeftPanel.Location = New-Object System.Drawing.Point(0, 0)
-$InstallLeftPanel.Size = New-Object System.Drawing.Size(560, 580)
+$InstallLeftPanel.Dock = [System.Windows.Forms.DockStyle]::Fill
 $InstallLeftPanel.AutoScroll = $true
 $InstallLeftPanel.BackColor = $Global:Theme.BG
-$TabInstall.Controls.Add($InstallLeftPanel)
+$InstallSplit.Panel1.Controls.Add($InstallLeftPanel)
 
 $InstallLeftPanel.Controls.Add((New-SectionTitle -Text "GESTOR DE PAQUETES" -X 10 -Y 5 -W 300))
 
@@ -1064,11 +1089,10 @@ foreach ($Cat in $SoftwareData.Keys) {
 
 # --- Panel derecho ---
 $InstallRightPanel = New-Object System.Windows.Forms.Panel
-$InstallRightPanel.Location = New-Object System.Drawing.Point(565, 0)
-$InstallRightPanel.Size = New-Object System.Drawing.Size(510, 580)
+$InstallRightPanel.Dock = [System.Windows.Forms.DockStyle]::Fill
 $InstallRightPanel.AutoScroll = $true
 $InstallRightPanel.BackColor = $Global:Theme.Surface
-$TabInstall.Controls.Add($InstallRightPanel)
+$InstallSplit.Panel2.Controls.Add($InstallRightPanel)
 
 $InstallRightPanel.Controls.Add((New-SectionTitle -Text "ACCIONES" -X 15 -Y 10 -W 200))
 
@@ -2100,11 +2124,36 @@ $MASStatusBar = New-Object System.Windows.Forms.ToolStripStatusLabel
 $MASStatusBar.Text = "  MAS: $(if($masFound){'OK'}else{'--'})"; $MASStatusBar.ForeColor = if($masFound){$Global:Theme.Success}else{$Global:Theme.Warning}
 $StatusStrip.Items.Add($MASStatusBar)
 
+# Agregar el StatusStrip ANTES del TabControl para que Dock=Fill del TabControl
+# no tape la barra de estado (el orden de Add con Dock importa: Top/Bottom primero, Fill al ultimo)
+$StatusStrip.Dock = [System.Windows.Forms.DockStyle]::Bottom
 $Global:Form.Controls.Add($StatusStrip)
+# Ahora si agregar el TabControl con Dock=Fill - ocupara todo el espacio entre header y status
+$Global:Form.Controls.Add($TabControl)
+
+# ============================================================================
+#  HANDLER DE RESIZE - Reajustar elementos con posiciones absolutas
+# ============================================================================
+# Los paneles con Dock=Fill/Top/Bottom se ajustan solos, pero algunos labels
+# del header y cards de OPTIMIZAR tienen posiciones absolutas que necesitan
+# reacomodo al cambiar el tamano de la ventana.
+$Global:Form.Add_Resize({
+    try {
+        # El header usa Dock=Top y sus labels ya estan anclados (Anchor)
+        # con Top+Right, asi que se reposicionan automaticamente.
+        # Forzar repintado del header por si acaso.
+        if ($HeaderPanel) { $HeaderPanel.Invalidate() }
+        # El TabControl usa Dock=Fill - se ajusta solo.
+        # El SplitContainer del tab INSTALAR usa Dock=Fill - se ajusta solo.
+        # Los ScrollPanels de cada pestania usan Dock=Fill - se ajustan solos.
+    } catch {}
+})
 
 # ============================================================================
 #  INICIAR
 # ============================================================================
 Write-Log "SHADOWIEX v15.0 iniciado"
 Update-Status "SHADOWIEX v15.0 Professional - Listo"
+# Forzar un layout inicial para que todo se posicione correctamente
+$Global:Form.PerformLayout()
 [void]$Global:Form.ShowDialog()
