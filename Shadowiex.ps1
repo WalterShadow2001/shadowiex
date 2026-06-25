@@ -1675,6 +1675,212 @@ foreach ($AV in $AVTools) {
     if ($AVCol -ge 4) { $AVCol = 0; $AVX = 15; $AVY += 98 } else { $AVX += 256 }
 }
 
+# --- Seccion: REMOVER OFFICE ---
+$OfficeSectionY = if ($AVCol -eq 0) { $AVY } else { $AVY + 98 }
+$OfficeSectionY += 15
+$TweakScroll.Controls.Add((New-SectionTitle -Text "REMOVER OFFICE (DESINSTALACION FORZADA)" -X 15 -Y $OfficeSectionY))
+
+$OfficeRemoveY = $OfficeSectionY + 30
+# Card 1: Force Clean
+$OC1 = New-Card -X 15 -Y $OfficeRemoveY -W 248 -H 90
+$TweakScroll.Controls.Add($OC1)
+$BtnOC1 = New-Btn -Text "OFFICE FORCE CLEAN" -X 10 -Y 10 -W 228 -H 36 -Color "Danger"
+$BtnOC1.Add_Click({
+    $R = [System.Windows.Forms.MessageBox]::Show(
+        "OFFICE FORCE CLEAN - Desinstalacion forzada de Microsoft Office`n`nEste proceso eliminara TODAS las instalaciones de Office (C2R y MSI),`nlimpiara registros y archivos residuales.`n`nAVISO: Se requiere reinicio despues del proceso.`n`nDeseas continuar?",
+        "SHADOWIEX", 4, [System.Windows.Forms.MessageBoxIcon]::Warning)
+    if ($R -eq 6) {
+        Update-Status "Generando script de limpieza Office..."
+        try {
+            $scriptContent = @'
+# SHADOWIEX - Office Force Clean v1.0
+$Host.UI.RawUI.WindowTitle = "SHADOWIEX - Office Force Clean"
+Write-Host ""
+Write-Host "========================================" -ForegroundColor Cyan
+Write-Host "  SHADOWIEX - Office Force Clean" -ForegroundColor Cyan
+Write-Host "  Desinstalacion forzada de Office" -ForegroundColor Cyan
+Write-Host "========================================" -ForegroundColor Cyan
+Write-Host ""
+
+# --- PASO 1: Cerrar procesos de Office ---
+Write-Host "[1/7] Cerrando procesos de Office..." -ForegroundColor Yellow
+$officeProcs = @("WINWORD","EXCEL","OUTLOOK","POWERPNT","MSACCESS","ONENOTE","MSPUB","MSQUERY",
+                 "LYNC","SKYPE","TEAMS","CLICKTORUN","OFFICETELEMETRY","MSOSYNC","GROOVE",
+                 "ONEDRIVE","WINPROJ","VISIO","MSMPENG","MSASCUI","SECHEALTH")
+$killed = 0
+$officeProcs | ForEach-Object {
+    try { $p = Get-Process -Name $_ -EA 0; if ($p) { Stop-Process -Name $_ -Force -EA 0; $killed++ } } catch {}
+}
+Start-Sleep -Seconds 2
+Write-Host "  Procesos cerrados: $killed" -ForegroundColor Gray
+
+# --- PASO 2: Detener servicios de Office ---
+Write-Host "[2/7] Deteniendo servicios de Office..." -ForegroundColor Yellow
+$officeSvcs = @("ClickToRunSvc","osppsvc","OfficeSvc","ose64","ose")
+$officeSvcs | ForEach-Object {
+    try { Stop-Service -Name $_ -Force -EA 0; Set-Service -Name $_ -StartupType Disabled -EA 0 } catch {}
+}
+Start-Sleep -Seconds 1
+
+# --- PASO 3: Desinstalar Office ClickToRun ---
+Write-Host "[3/7] Desinstalando Office ClickToRun..." -ForegroundColor Yellow
+$ctrExe = "$env:CommonProgramFiles\Microsoft Shared\ClickToRun\OfficeClickToRun.exe"
+if (Test-Path $ctrExe) {
+    Write-Host "  C2R detectado: $ctrExe" -ForegroundColor Gray
+    try {
+        Stop-Process -Name "OfficeClickToRun" -Force -EA 0
+        Start-Sleep -Seconds 2
+        # Leer productos instalados
+        $regPath = "HKLM:\SOFTWARE\Microsoft\Office\ClickToRun\Configuration"
+        if (Test-Path $regPath) {
+            $products = (Get-ItemProperty $regPath -EA 0).ProductReleaseIds
+            if ($products) {
+                Write-Host "  Productos C2R: $products" -ForegroundColor Gray
+            }
+        }
+        # Ejecutar desinstalacion C2R
+        $proc = Start-Process $ctrExe -ArgumentList "scenario=install scenariosubtype=uninstall level=1" -Wait -PassThru -EA 0
+        if ($proc.ExitCode -eq 0) { Write-Host "  C2R desinstalado correctamente" -ForegroundColor Green }
+        else { Write-Host "  C2R proceso terminado (codigo: $($proc.ExitCode))" -ForegroundColor DarkYellow }
+    } catch { Write-Host "  Error desinstalando C2R: $_" -ForegroundColor Red }
+} else {
+    Write-Host "  ClickToRun no encontrado" -ForegroundColor Gray
+}
+
+# --- PASO 4: Desinstalar Office MSI ---
+Write-Host "[4/7] Buscando instalaciones Office MSI..." -ForegroundColor Yellow
+$uninstallPaths = @(
+    "HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\*",
+    "HKLM:\SOFTWARE\WOW6432Node\Microsoft\Windows\CurrentVersion\Uninstall\*"
+)
+$msiCount = 0
+$uninstallPaths | ForEach-Object {
+    Get-ItemProperty $_ -EA 0 | Where-Object {
+        $_.DisplayName -match "Microsoft Office" -and $_.DisplayName -notmatch "Viewer|Compatibility|Update|Shared"
+    } | ForEach-Object {
+        $name = $_.DisplayName
+        $uninstallStr = $_.UninstallString
+        Write-Host "  Encontrado: $name" -ForegroundColor Gray
+        if ($uninstallStr) {
+            try {
+                if ($uninstallStr -match "msiexec.*\{([A-F0-9\-]+)\}") {
+                    $guid = $Matches[1]
+                    Write-Host "    MSI desinstalando ($guid)..." -ForegroundColor DarkGray
+                    Start-Process msiexec.exe -ArgumentList "/x `"$guid`" /qn /norestart" -Wait -EA 0
+                } elseif ($uninstallStr -match "msiexec") {
+                    $cmd = $uninstallStr -replace "/I","/X"
+                    $cmd += " /qn /norestart"
+                    Start-Process cmd -ArgumentList "/c `"$cmd`"" -Wait -EA 0
+                } else {
+                    $cmd = $uninstallStr
+                    if ($cmd -notmatch "/quiet|/qn") { $cmd += " /quiet /norestart" }
+                    Start-Process cmd -ArgumentList "/c `"$cmd`"" -Wait -EA 0
+                }
+                $msiCount++
+                Write-Host "    Desinstalado" -ForegroundColor Green
+            } catch { Write-Host "    Error: $_" -ForegroundColor Red }
+        }
+    }
+}
+if ($msiCount -eq 0) { Write-Host "  No se encontraron instalaciones MSI" -ForegroundColor Gray }
+
+# --- PASO 5: Limpiar registros de Office ---
+Write-Host "[5/7] Limpiando registros de Office..." -ForegroundColor Yellow
+$regKeys = @(
+    "HKLM:\SOFTWARE\Microsoft\Office",
+    "HKLM:\SOFTWARE\WOW6432Node\Microsoft\Office",
+    "HKCU:\SOFTWARE\Microsoft\Office",
+    "HKLM:\SOFTWARE\Microsoft\Office\ClickToRun",
+    "HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\*"
+)
+$regCleaned = 0
+foreach ($rk in $regKeys) {
+    try { Remove-Item -Path $rk -Recurse -Force -EA 0; $regCleaned++ } catch {}
+}
+# Limpiar entradas especificas de Office en Uninstall
+$uninstallPaths | ForEach-Object {
+    Get-ItemProperty $_ -EA 0 | Where-Object { $_.DisplayName -match "Microsoft Office" } | ForEach-Object {
+        $keyPath = $_.PSPath
+        try { Remove-Item -Path $keyPath -Recurse -Force -EA 0; $regCleaned++ } catch {}
+    }
+}
+Write-Host "  Registros limpiados: $regCleaned" -ForegroundColor Gray
+
+# --- PASO 6: Limpiar archivos residuales ---
+Write-Host "[6/7] Eliminando archivos residuales..." -ForegroundColor Yellow
+$folders = @(
+    "$env:ProgramFiles\Microsoft Office",
+    "${env:ProgramFiles(x86)}\Microsoft Office",
+    "$env:ProgramFiles\Microsoft Office 15",
+    "$env:ProgramFiles\Microsoft Office 16",
+    "$env:ProgramFiles\Microsoft Office\root",
+    "${env:ProgramFiles(x86)}\Microsoft Office\root",
+    "$env:CommonProgramFiles\Microsoft Shared\ClickToRun",
+    "${env:CommonProgramFiles(x86)}\Microsoft Shared\ClickToRun",
+    "$env:CommonProgramFiles\microsoft shared\Office16",
+    "${env:CommonProgramFiles(x86)}\microsoft shared\Office16",
+    "$env:LOCALAPPDATA\Microsoft\Office",
+    "$env:LOCALAPPDATA\Microsoft\Office16.0",
+    "$env:APPDATA\Microsoft\Office",
+    "$env:APPDATA\Microsoft\Templates",
+    "$env:ProgramData\Microsoft\Office",
+    "$env:ProgramData\Microsoft\ClickToRun"
+)
+$folderCount = 0
+$sizeFreed = 0
+foreach ($f in $folders) {
+    if (Test-Path $f) {
+        try {
+            $size = (Get-ChildItem $f -Recurse -Force -EA 0 | Measure-Object -Property Length -Sum -EA 0).Sum
+            $sizeFreed += $size
+            Remove-Item -Path $f -Recurse -Force -EA 0
+            $folderCount++
+        } catch {}
+    }
+}
+$freedMB = [math]::Round($sizeFreed / 1MB, 1)
+Write-Host "  Carpetas eliminadas: $folderCount (~$freedMB MB)" -ForegroundColor Gray
+
+# --- PASO 7: Resumen ---
+Write-Host ""
+Write-Host "========================================" -ForegroundColor Cyan
+Write-Host "  LIMPIEZA COMPLETADA" -ForegroundColor Green
+Write-Host "========================================" -ForegroundColor Cyan
+Write-Host ""
+Write-Host "  Procesos cerrados:    $killed" -ForegroundColor White
+Write-Host "  Instalaciones MSI:    $msiCount" -ForegroundColor White
+Write-Host "  Registros limpiados:  $regCleaned" -ForegroundColor White
+Write-Host "  Carpetas eliminadas:  $folderCount (~$freedMB MB)" -ForegroundColor White
+Write-Host ""
+Write-Host "  IMPORTANTE: Reinicia el equipo para completar la limpieza." -ForegroundColor Yellow
+Write-Host ""
+Read-Host "Presiona Enter para cerrar"
+'@
+            $scriptPath = Join-Path $env:TEMP "SHADOWIEX_OfficeForceClean.ps1"
+            $scriptContent | Out-File $scriptPath -Encoding UTF8 -Force
+            Update-Status "Ejecutando Office Force Clean..." "success"
+            Write-Log "Office Force Clean ejecutado"
+            Start-Process powershell.exe -ArgumentList "-NoProfile -ExecutionPolicy Bypass -File `"$scriptPath`"" -Verb RunAs
+        } catch { Update-Status "Error: $_" "error" }
+    }
+}.GetNewClosure())
+$OC1.Controls.Add($BtnOC1)
+$OC1.Controls.Add((New-DescLabel -Text "Elimina Office C2R+MSI, registros y archivos" -X 10 -Y 55 -W 228 -H 18))
+
+# Card 2: Official Microsoft Tool
+$OC2 = New-Card -X 271 -Y $OfficeRemoveY -W 248 -H 90
+$TweakScroll.Controls.Add($OC2)
+$BtnOC2 = New-Btn -Text "OFFICE TOOL OFICIAL" -X 10 -Y 10 -W 228 -H 36 -Color "Secondary"
+$BtnOC2.Add_Click({
+    Update-Status "Abriendo herramienta oficial Microsoft..."
+    try {
+        Start-Process "https://aka.ms/OfficeUninstall"
+        Write-Log "Office official uninstall tool abierto"
+    } catch { Update-Status "Error abriendo herramienta" "error" }
+})
+$OC2.Controls.Add($BtnOC2)
+$OC2.Controls.Add((New-DescLabel -Text "Abre la herramienta oficial de Microsoft para desinstalar Office" -X 10 -Y 55 -W 228 -H 18))
+
 # ============================================================================
 #  CONFIG TAB
 # ============================================================================
