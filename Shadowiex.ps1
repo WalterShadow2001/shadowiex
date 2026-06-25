@@ -172,7 +172,7 @@ function Write-Log {
 $Global:MAS_File = $null
 
 function Find-MAS {
-    if ($Global:MAS_File -and (Test-Path $Global:MAS_File)) { return $Global:MAS_File }
+    if ($Global:MAS_File -and (Test-Path $Global:MAS_File) -and (Get-Item $Global:MAS_File).Length -gt 1KB) { return $Global:MAS_File }
     $searchPaths = @()
     try {
         $sd = $Global:ScriptDir
@@ -183,10 +183,9 @@ function Find-MAS {
     } catch {}
     $searchPaths += ".\MAS_AIO.cmd"
     try { $searchPaths += Join-Path ([Environment]::GetFolderPath("Desktop")) "MAS_AIO.cmd" } catch {}
-    $searchPaths += Join-Path $env:TEMP "SHADOWIEX_MAS.cmd"
     try { $searchPaths += Join-Path $env:USERPROFILE "Downloads\MAS_AIO.cmd" } catch {}
     foreach ($p in $searchPaths) {
-        if ($p -and (Test-Path $p)) { $Global:MAS_File = $p; return $p }
+        if ($p -and (Test-Path $p) -and (Get-Item $p).Length -gt 1KB) { $Global:MAS_File = $p; return $p }
     }
     return $null
 }
@@ -203,22 +202,48 @@ function Deploy-MAS {
         try {
             $url = "https://raw.githubusercontent.com/massgravel/Microsoft-Activation-Scripts/master/MAS/Separate-Files-Version/Activators/MAS_AIO.cmd"
             $dest = Join-Path $env:TEMP "SHADOWIEX_MAS.cmd"
+            # Borrar archivo viejo si existe (evita usar archivo corrupto cacheado)
+            if (Test-Path $dest) { Remove-Item -Force $dest }
             [Net.ServicePointManager]::SecurityProtocol = 3072
             (New-Object System.Net.WebClient).DownloadFile($url, $dest)
-            $Global:MAS_File = $dest
-            Update-Status "MAS descargado" "success"
-            Write-Log "MAS descargado a $dest"
-            return $dest
-        } catch { Update-Status "Error descargando MAS" "error"; return $null }
+            # Verificar que el archivo se descargo correctamente (>1KB)
+            if ((Test-Path $dest) -and (Get-Item $dest).Length -gt 1KB) {
+                $Global:MAS_File = $dest
+                Update-Status "MAS descargado ($( [math]::Round((Get-Item $dest).Length/1KB, 1) ) KB)" "success"
+                Write-Log "MAS descargado a $dest"
+                return $dest
+            } else {
+                Update-Status "Error: descarga incompleta o fallida" "error"
+                Write-Log "Error: MAS descarga incompleta"
+                if (Test-Path $dest) { Remove-Item -Force $dest }
+                return $null
+            }
+        } catch { Update-Status "Error descargando MAS: $_" "error"; return $null }
     }
     return $null
 }
 
 function Invoke-MASInteractive { $f = Deploy-MAS; if ($f) { Start-Process "cmd.exe" -ArgumentList "/c `"$f`"" -Verb RunAs } }
-function Invoke-MAS_HWID      { $f = Deploy-MAS; if ($f) { Start-Process "cmd.exe" -ArgumentList "/c `"$f`" /HWID" -Verb RunAs } }
-function Invoke-MAS_TSforge   { $f = Deploy-MAS; if ($f) { Start-Process "cmd.exe" -ArgumentList "/c `"$f`" /Z-Windows" -Verb RunAs } }
-function Invoke-MAS_Ohook     { $f = Deploy-MAS; if ($f) { Start-Process "cmd.exe" -ArgumentList "/c `"$f`" /Ohook" -Verb RunAs } }
-function Invoke-MAS_KMS       { $f = Deploy-MAS; if ($f) { Start-Process "cmd.exe" -ArgumentList "/c `"$f`" /K-WindowsOffice" -Verb RunAs } }
+function Invoke-MAS_HWID      { $f = Deploy-MAS; if ($f) {
+    $tmpScript = Join-Path $env:TEMP "SHADOWIEX_RunMAS.cmd"
+    "@echo off & chcp 65001 >nul & call `"$f`" /HWID & pause" | Out-File $tmpScript -Encoding ASCII -Force
+    Start-Process "cmd.exe" -ArgumentList "/c `"$tmpScript`"" -Verb RunAs
+}}
+function Invoke-MAS_TSforge   { $f = Deploy-MAS; if ($f) {
+    $tmpScript = Join-Path $env:TEMP "SHADOWIEX_RunMAS.cmd"
+    "@echo off & chcp 65001 >nul & call `"$f`" /TSforge & pause" | Out-File $tmpScript -Encoding ASCII -Force
+    Start-Process "cmd.exe" -ArgumentList "/c `"$tmpScript`"" -Verb RunAs
+}}
+function Invoke-MAS_Ohook     { $f = Deploy-MAS; if ($f) {
+    $tmpScript = Join-Path $env:TEMP "SHADOWIEX_RunMAS.cmd"
+    "@echo off & chcp 65001 >nul & call `"$f`" /Ohook & pause" | Out-File $tmpScript -Encoding ASCII -Force
+    Start-Process "cmd.exe" -ArgumentList "/c `"$tmpScript`"" -Verb RunAs
+}}
+function Invoke-MAS_KMS       { $f = Deploy-MAS; if ($f) {
+    $tmpScript = Join-Path $env:TEMP "SHADOWIEX_RunMAS.cmd"
+    "@echo off & chcp 65001 >nul & call `"$f`" /KMS & pause" | Out-File $tmpScript -Encoding ASCII -Force
+    Start-Process "cmd.exe" -ArgumentList "/c `"$tmpScript`"" -Verb RunAs
+}}
 
 function Invoke-MAS_iex {
     Update-Status "Ejecutando MAS via iex (online)..."
