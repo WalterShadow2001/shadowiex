@@ -1791,47 +1791,87 @@ $BtnOC1.Add_Click({
         "OFFICE FORCE CLEAN - Desinstalacion forzada de Microsoft Office`n`nEste proceso eliminara TODAS las instalaciones de Office (C2R y MSI),`nlimpiara registros y archivos residuales.`n`nAVISO: Se requiere reinicio despues del proceso.`n`nDeseas continuar?",
         "SHADOWIEX", 4, [System.Windows.Forms.MessageBoxIcon]::Warning)
     if ($R -eq 6) {
-        Update-Status "Generando script de limpieza Office..."
+        Update-Status "Generando script de limpieza Office agresivo..."
         try {
             $scriptContent = @'
-# SHADOWIEX - Office Force Clean v1.0
-$Host.UI.RawUI.WindowTitle = "SHADOWIEX - Office Force Clean"
+# SHADOWIEX - Office Force Clean v2.0 (Agresivo)
+$Host.UI.RawUI.WindowTitle = "SHADOWIEX - Office Force Clean v2.0"
 Write-Host ""
 Write-Host "========================================" -ForegroundColor Cyan
-Write-Host "  SHADOWIEX - Office Force Clean" -ForegroundColor Cyan
-Write-Host "  Desinstalacion forzada de Office" -ForegroundColor Cyan
+Write-Host "  SHADOWIEX - Office Force Clean v2.0" -ForegroundColor Cyan
+Write-Host "  Desinstalacion AGRESIVA de Office" -ForegroundColor Cyan
 Write-Host "========================================" -ForegroundColor Cyan
 Write-Host ""
 
-# --- PASO 1: Cerrar procesos de Office ---
-# Nota: MSMPENG/MSASCUI/SECHEALTH pertenecen a Windows Defender y NO deben cerrarse
-Write-Host "[1/8] Cerrando procesos de Office..." -ForegroundColor Yellow
+# Asegurar privilegio de administrador
+$isAdmin = ([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)
+if (-not $isAdmin) {
+    Write-Host "ERROR: Este script requiere privilegios de administrador." -ForegroundColor Red
+    Write-Host "Ejecutalo como administrador o usa el boton desde SHADOWIEX (que ya se eleva)." -ForegroundColor Yellow
+    Read-Host "Presiona Enter para salir"
+    exit 1
+}
+
+# Habilitar detencion de procesos del sistema (necesario para procesos protegidos de Office)
+try { Set-ExecutionPolicy -Scope Process Bypass -Force -EA 0 } catch {}
+
+# --- PASO 1: Cerrar procesos de Office AGRESIVAMENTE ---
+Write-Host "[1/9] Cerrando procesos de Office (taskkill /F /T)..." -ForegroundColor Yellow
 $officeProcs = @("WINWORD","EXCEL","OUTLOOK","POWERPNT","MSACCESS","ONENOTE","MSPUB","MSQUERY",
                  "LYNC","SKYPE","TEAMS","CLICKTORUN","OFFICETELEMETRY","MSOSYNC","GROOVE",
                  "ONEDRIVE","WINPROJ","VISIO","BCREDITIALUI","SEARCHPROTOCOLHOST","SEARCHFILTERHOST",
-                 "CLVIEW","DCF","EXCEL.EXE","MSOUCAF","OIS","MOC")
+                 "CLVIEW","DCF","MSOUCAF","OIS","MOC","OFFICESAS","OFFICEUPLOADCENTER",
+                 "MOSETUP","INTEGRATEOFFICEEXE","ICOFFICE","FIRSTRUN","CSISYNCCLIENT",
+                 "MICROSOFT.SHAREPOINT.EXE","MIPUSHNOTIFICATIONS","OFFICEC2RCLIENT","APPVLPX86",
+                 "APPVSHNOTIFY","APVBOOTSTRAPPER","APPVLP","INTEGRATEOFFICEEXE","SETHOOK.EXE")
 $killed = 0
+# Primera pasada: taskkill /F /T (mata proceso y todos sus hijos, incluso protegidos)
 $officeProcs | Sort-Object -Unique | ForEach-Object {
-    try { $p = Get-Process -Name $_ -EA 0; if ($p) { Stop-Process -Name $_ -Force -EA 0; $killed++ } } catch {}
+    try {
+        $null = & taskkill /F /T /IM "$_.exe" 2>$null
+        if ($LASTEXITCODE -eq 0) { $killed++ }
+    } catch {}
 }
+# Segunda pasada: Stop-Process para los que sobrevivieron
+Start-Sleep -Seconds 1
+$officeProcs | Sort-Object -Unique | ForEach-Object {
+    try { $p = Get-Process -Name $_ -EA 0; if ($p) { $p | Stop-Process -Force -EA 0; $killed++ } } catch {}
+}
+# Tercera pasada: matar cualquier proceso con ruta Office
+try {
+    Get-Process | Where-Object { $_.Path -and $_.Path -match "Microsoft Office|Microsoft\\Office|Office16|Office15|ClickToRun" } | ForEach-Object {
+        try { Stop-Process -Id $_.Id -Force -EA 0; $killed++ } catch {}
+    }
+} catch {}
 Start-Sleep -Seconds 2
 Write-Host "  Procesos cerrados: $killed" -ForegroundColor Gray
 
-# --- PASO 2: Detener servicios de Office ---
-Write-Host "[2/8] Deteniendo servicios de Office..." -ForegroundColor Yellow
-$officeSvcs = @("ClickToRunSvc","osppsvc","OfficeSvc","ose64","ose","OfficeTelemetryAgentLogon","OfficeTelemetryAgentSysprep")
-$officeSvcs | ForEach-Object {
-    try { Stop-Service -Name $_ -Force -EA 0; Set-Service -Name $_ -StartupType Disabled -EA 0 } catch {}
+# --- PASO 2: Detener y deshabilitar servicios de Office ---
+Write-Host "[2/9] Deteniendo servicios de Office..." -ForegroundColor Yellow
+$officeSvcs = @("ClickToRunSvc","osppsvc","OfficeSvc","ose64","ose","OfficeTelemetryAgentLogon","OfficeTelemetryAgentSysprep","OfficeSoftwareProtectionPlatform")
+foreach ($svc in $officeSvcs) {
+    try {
+        # Intentar detener via sc.exe (mas agresivo que Stop-Service)
+        $null = & sc.exe stop $svc 2>$null
+        Start-Sleep -Milliseconds 200
+        $null = & sc.exe config $svc start= disabled 2>$null
+        # Backup via PowerShell
+        Stop-Service -Name $svc -Force -EA 0
+        Set-Service -Name $svc -StartupType Disabled -EA 0
+    } catch {}
 }
+# Tambien matar procesos de servicio directamente
+try { Get-Process | Where-Object { $_.ProcessName -match "ose|osppsvc|OfficeClickToRun|OfficeTelemetry" } | Stop-Process -Force -EA 0 } catch {}
 Start-Sleep -Seconds 1
 
 # --- PASO 3: Desinstalar Office ClickToRun ---
-Write-Host "[3/8] Desinstalando Office ClickToRun..." -ForegroundColor Yellow
+Write-Host "[3/9] Desinstalando Office ClickToRun..." -ForegroundColor Yellow
 $ctrExe = "$env:CommonProgramFiles\Microsoft Shared\ClickToRun\OfficeClickToRun.exe"
 if (Test-Path $ctrExe) {
     Write-Host "  C2R detectado: $ctrExe" -ForegroundColor Gray
     try {
-        Stop-Process -Name "OfficeClickToRun" -Force -EA 0
+        # Matar proceso antes de desinstalar
+        $null = & taskkill /F /T /IM OfficeClickToRun.exe 2>$null
         Start-Sleep -Seconds 2
         # Leer productos instalados
         $regPath = "HKLM:\SOFTWARE\Microsoft\Office\ClickToRun\Configuration"
@@ -1840,10 +1880,10 @@ if (Test-Path $ctrExe) {
             $products = (Get-ItemProperty $regPath -EA 0).ProductReleaseIds
             if ($products) { Write-Host "  Productos C2R: $products" -ForegroundColor Gray }
         }
-        # Ejecutar desinstalacion C2R - incluir products y displaylevel para evitar colgar en modo silencioso
-        $args = @("scenario=install","scenariosubtype=uninstall","level=1","displaylevel=true")
-        if ($products) { $args += "products=$products" }
-        $proc = Start-Process $ctrExe -ArgumentList $args -Wait -PassThru -EA 0
+        # Ejecutar desinstalacion C2R con todos los flags
+        $c2rArgs = @("scenario=install","scenariosubtype=uninstall","level=1","displaylevel=true")
+        if ($products) { $c2rArgs += "products=$products" }
+        $proc = Start-Process $ctrExe -ArgumentList $c2rArgs -Wait -PassThru -EA 0
         if ($proc -and $proc.ExitCode -eq 0) { Write-Host "  C2R desinstalado correctamente" -ForegroundColor Green }
         elseif ($proc) { Write-Host "  C2R proceso terminado (codigo: $($proc.ExitCode))" -ForegroundColor DarkYellow }
     } catch { Write-Host "  Error desinstalando C2R: $_" -ForegroundColor Red }
@@ -1851,16 +1891,18 @@ if (Test-Path $ctrExe) {
     Write-Host "  ClickToRun no encontrado" -ForegroundColor Gray
 }
 
-# --- PASO 4: Desinstalar Office MSI ---
-Write-Host "[4/8] Buscando instalaciones Office MSI..." -ForegroundColor Yellow
+# --- PASO 4: Desinstalar Office MSI (incluyendo ocultos) ---
+Write-Host "[4/9] Buscando instalaciones Office MSI (incluyendo ocultos)..." -ForegroundColor Yellow
 $uninstallPaths = @(
     "HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\*",
-    "HKLM:\SOFTWARE\WOW6432Node\Microsoft\Windows\CurrentVersion\Uninstall\*"
+    "HKLM:\SOFTWARE\WOW6432Node\Microsoft\Windows\CurrentVersion\Uninstall\*",
+    "HKCU:\SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\*"
 )
 $msiCount = 0
 $uninstallPaths | ForEach-Object {
     Get-ItemProperty $_ -EA 0 | Where-Object {
-        $_.DisplayName -match "Microsoft Office" -and $_.DisplayName -notmatch "Viewer|Compatibility|Update|Shared|Proof|FileFormat"
+        $_.DisplayName -match "Microsoft Office|Office 365|Microsoft 365|ProPlus|HomeStudent|HomeBusiness" -and
+        $_.DisplayName -notmatch "Viewer|Compatibility|Update|Shared|Proof|FileFormat"
     } | ForEach-Object {
         $name = $_.DisplayName
         $uninstallStr = $_.UninstallString
@@ -1870,10 +1912,15 @@ $uninstallPaths | ForEach-Object {
                 if ($uninstallStr -match "msiexec.*\{([A-F0-9\-]+)\}") {
                     $guid = $Matches[1]
                     Write-Host "    MSI desinstalando ($guid)..." -ForegroundColor DarkGray
-                    Start-Process msiexec.exe -ArgumentList "/x `"$guid`" /qn /norestart" -Wait -EA 0
+                    $p = Start-Process msiexec.exe -ArgumentList "/x `"$guid`" /qn /norestart REBOOT=Suppress" -Wait -PassThru -EA 0
+                    # Si falla, forzar con msiexec /x sin silent mode para que se complete
+                    if ($p -and $p.ExitCode -ne 0) {
+                        Write-Host "    Reintentando con UI passive..." -ForegroundColor DarkGray
+                        Start-Process msiexec.exe -ArgumentList "/x `"$guid`" /passive /norestart REBOOT=Suppress" -Wait -EA 0
+                    }
                 } elseif ($uninstallStr -match "msiexec") {
                     $cmd = $uninstallStr -replace "/I","/X"
-                    $cmd += " /qn /norestart"
+                    $cmd += " /qn /norestart REBOOT=Suppress"
                     Start-Process cmd -ArgumentList "/c `"$cmd`"" -Wait -EA 0
                 } else {
                     $cmd = $uninstallStr
@@ -1888,21 +1935,45 @@ $uninstallPaths | ForEach-Object {
 }
 if ($msiCount -eq 0) { Write-Host "  No se encontraron instalaciones MSI" -ForegroundColor Gray }
 
-# --- PASO 5: Limpiar registros de Office ---
-# NUEVO PASO 5: Tareas programadas de Office (Telemetry, Background Task)
-Write-Host "[5/8] Limpiando tareas programadas y registros de Office..." -ForegroundColor Yellow
-# 5a. Tareas programadas de Office (no se eliminaban en version anterior)
+# --- PASO 4b: Forzar eliminacion via WMI (catch-all) ---
+Write-Host "[4.5/9] Forzando eliminacion via WMI (Win32_Product)..." -ForegroundColor Yellow
+try {
+    $wmiOffice = Get-WmiObject -Class Win32_Product -Filter "Name LIKE '%Microsoft Office%' OR Name LIKE '%Office 365%' OR Name LIKE '%Microsoft 365%'" -EA 0
+    foreach ($prod in $wmiOffice) {
+        Write-Host "  WMI: $($prod.Name)" -ForegroundColor Gray
+        try {
+            $result = $prod.Uninstall()
+            if ($result.ReturnValue -eq 0) { Write-Host "    WMI desinstalado OK" -ForegroundColor Green }
+            else { Write-Host "    WMI codigo: $($result.ReturnValue)" -ForegroundColor DarkYellow }
+        } catch { Write-Host "    WMI error: $_" -ForegroundColor Red }
+    }
+} catch { Write-Host "  WMI no disponible o sin productos" -ForegroundColor Gray }
+
+# --- PASO 5: Limpiar tareas programadas y registros de Office ---
+Write-Host "[5/9] Limpiando tareas programadas y registros de Office..." -ForegroundColor Yellow
+# 5a. Tareas programadas de Office (lista ampliada)
 $officeTasks = @(
-    "\\Microsoft\\Office\\OfficeTelemetryAgentFallBack",
-    "\\Microsoft\\Office\\OfficeTelemetryAgentLogon",
-    "\\Microsoft\\Office\\Office 15 Subscription Heartbeat",
-    "\\Microsoft\\Office\\OfficeBackgroundTaskHandlerRegistration",
-    "\\Microsoft\\Office\\OfficeBackgroundTaskHandlerLogon"
+    "\Microsoft\Office\OfficeTelemetryAgentFallBack",
+    "\Microsoft\Office\OfficeTelemetryAgentLogon",
+    "\Microsoft\Office\Office 15 Subscription Heartbeat",
+    "\Microsoft\Office\OfficeBackgroundTaskHandlerRegistration",
+    "\Microsoft\Office\OfficeBackgroundTaskHandlerLogon",
+    "\Microsoft\Office\Office 16 Subscription Heartbeat",
+    "\Microsoft\Office\Office Automatic Upload",
+    "\Microsoft\Office\Office ClickToRun License Checker",
+    "\Microsoft\Office\Office License Heartbeat"
 )
 $tasksRemoved = 0
 foreach ($t in $officeTasks) {
     try { schtasks /Delete /TN $t /F 2>$null | Out-Null; if ($LASTEXITCODE -eq 0) { $tasksRemoved++ } } catch {}
 }
+# Tambien buscar y eliminar cualquier tarea que mencione Office
+try {
+    $allTasks = schtasks /Query /FO CSV 2>$null | ConvertFrom-Csv
+    $allTasks | Where-Object { $_.TaskName -match "Office|ClickToRun|Telemetry" } | ForEach-Object {
+        try { schtasks /Delete /TN $_.TaskName /F 2>$null | Out-Null; if ($LASTEXITCODE -eq 0) { $tasksRemoved++ } } catch {}
+    }
+} catch {}
 Write-Host "  Tareas programadas Office eliminadas: $tasksRemoved" -ForegroundColor Gray
 
 # 5b. Registros especificos de Office (NO borrar la rama completa Uninstall\*)
@@ -1913,12 +1984,13 @@ $regKeys = @(
     "HKLM:\SOFTWARE\Microsoft\Office\ClickToRun",
     "HKLM:\SOFTWARE\Microsoft\Office\16.0",
     "HKLM:\SOFTWARE\Microsoft\Office\15.0",
+    "HKLM:\SOFTWARE\Microsoft\Office\14.0",
     "HKCU:\SOFTWARE\Microsoft\Office\16.0",
     "HKCU:\SOFTWARE\Microsoft\Office\15.0",
+    "HKCU:\SOFTWARE\Microsoft\Office\14.0",
     "HKLM:\SOFTWARE\Microsoft\AppVISV",
-    "HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\O365BusinessRetail - es-mx",
-    "HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\O365HomePremRetail - es-mx",
-    "HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\ProPlusRetail - es-mx"
+    "HKLM:\SOFTWARE\Policies\Microsoft\Office",
+    "HKCU:\SOFTWARE\Policies\Microsoft\Office"
 )
 $regCleaned = 0
 foreach ($rk in $regKeys) {
@@ -1926,15 +1998,24 @@ foreach ($rk in $regKeys) {
 }
 # Limpiar SOLAMENTE entradas especificas de Office en Uninstall (no toda la rama)
 $uninstallPaths | ForEach-Object {
-    Get-ItemProperty $_ -EA 0 | Where-Object { $_.DisplayName -match "Microsoft Office|Office 365|Microsoft 365" } | ForEach-Object {
+    Get-ItemProperty $_ -EA 0 | Where-Object { $_.DisplayName -match "Microsoft Office|Office 365|Microsoft 365|ProPlus|HomeStudent|HomeBusiness" } | ForEach-Object {
         $keyPath = $_.PSPath
         try { Remove-Item -Path $keyPath -Recurse -Force -EA 0; $regCleaned++ } catch {}
     }
 }
+# Limpiar entradas de componentes en Classes\Installer\Products
+try {
+    Get-ChildItem "HKLM:\SOFTWARE\Classes\Installer\Products" -EA 0 | ForEach-Object {
+        $product = Get-ItemProperty $_.PSPath -EA 0
+        if ($product.ProductName -match "Microsoft Office|Office 365") {
+            try { Remove-Item -Path $_.PSPath -Recurse -Force -EA 0; $regCleaned++ } catch {}
+        }
+    }
+} catch {}
 Write-Host "  Registros limpiados: $regCleaned" -ForegroundColor Gray
 
-# --- PASO 6: Limpiar archivos residuales ---
-Write-Host "[6/8] Eliminando archivos residuales..." -ForegroundColor Yellow
+# --- PASO 6: Limpiar archivos residuales (TOMAR PROPIEDAD) ---
+Write-Host "[6/9] Eliminando archivos residuales (tomando propiedad)..." -ForegroundColor Yellow
 $folders = @(
     "$env:ProgramFiles\Microsoft Office",
     "${env:ProgramFiles(x86)}\Microsoft Office",
@@ -1946,12 +2027,18 @@ $folders = @(
     "${env:CommonProgramFiles(x86)}\Microsoft Shared\ClickToRun",
     "$env:CommonProgramFiles\microsoft shared\Office16",
     "${env:CommonProgramFiles(x86)}\microsoft shared\Office16",
+    "$env:CommonProgramFiles\microsoft shared\Office15",
+    "${env:CommonProgramFiles(x86)}\microsoft shared\Office15",
     "$env:LOCALAPPDATA\Microsoft\Office",
     "$env:LOCALAPPDATA\Microsoft\Office16.0",
+    "$env:LOCALAPPDATA\Microsoft\Office 16",
+    "$env:LOCALAPPDATA\Microsoft\OneNote",
     "$env:APPDATA\Microsoft\Office",
     "$env:APPDATA\Microsoft\Templates",
     "$env:ProgramData\Microsoft\Office",
-    "$env:ProgramData\Microsoft\ClickToRun"
+    "$env:ProgramData\Microsoft\ClickToRun",
+    "$env:ProgramData\Microsoft\OfficeSoftwareProtectionPlatform",
+    "$env:windir\assembly\GAC_MSIL\Office"
 )
 $folderCount = 0
 $sizeFreed = 0
@@ -1960,7 +2047,16 @@ foreach ($f in $folders) {
         try {
             $size = (Get-ChildItem $f -Recurse -Force -EA 0 | Measure-Object -Property Length -Sum -EA 0).Sum
             $sizeFreed += $size
+            # Tomar propiedad antes de eliminar (archivos protegidos)
+            try {
+                & takeown /F $f /R /D Y 2>$null | Out-Null
+                & icacls $f /grant "*S-1-5-32-544:F" /T /C /Q 2>$null | Out-Null
+            } catch {}
             Remove-Item -Path $f -Recurse -Force -EA 0
+            # Verificar si se elimino; si no, forzar con cmd
+            if (Test-Path $f) {
+                try { & cmd /c "rmdir /S /Q `"$f`"" 2>$null } catch {}
+            }
             $folderCount++
         } catch {}
     }
@@ -1968,21 +2064,78 @@ foreach ($f in $folders) {
 $freedMB = [math]::Round($sizeFreed / 1MB, 1)
 Write-Host "  Carpetas eliminadas: $folderCount (~$freedMB MB)" -ForegroundColor Gray
 
-# --- PASO 7: Verificacion final y resumen ---
+# --- PASO 7: Limpiar cache de Windows Installer de Office ---
+Write-Host "[7/9] Limpiando cache de Windows Installer (MSP/MSI)..." -ForegroundColor Yellow
+try {
+    $installerCache = "$env:windir\Installer"
+    $cacheCleaned = 0
+    if (Test-Path $installerCache) {
+        # Eliminar archivos .msp y .msi que pertenezcan a Office
+        Get-ChildItem $installerCache -Filter "*.msp" -EA 0 | ForEach-Object {
+            try {
+                $productCode = (Get-Item $_.FullName -EA 0).VersionInfo.ProductName
+                if ($productCode -match "Office") {
+                    Remove-Item $_.FullName -Force -EA 0
+                    $cacheCleaned++
+                }
+            } catch {}
+        }
+        Get-ChildItem $installerCache -Filter "*.msi" -EA 0 | ForEach-Object {
+            try {
+                $productCode = (Get-Item $_.FullName -EA 0).VersionInfo.ProductName
+                if ($productCode -match "Office") {
+                    Remove-Item $_.FullName -Force -EA 0
+                    $cacheCleaned++
+                }
+            } catch {}
+        }
+    }
+    Write-Host "  Archivos de cache Office eliminados: $cacheCleaned" -ForegroundColor Gray
+} catch { Write-Host "  Cache Installer no accesible" -ForegroundColor Gray }
+
+# --- PASO 8: Limpiar registro de COM y ActiveX de Office ---
+Write-Host "[8/9] Limpiando registros COM/ActiveX de Office..." -ForegroundColor Yellow
+$comCleaned = 0
+try {
+    # Clases CLSID que contengan Office
+    Get-ChildItem "HKLM:\SOFTWARE\Classes\CLSID" -EA 0 | ForEach-Object {
+        try {
+            $default = (Get-ItemProperty $_.PSPath -EA 0).'(default)'
+            if ($default -match "Microsoft Office|Office 365") {
+                Remove-Item -Path $_.PSPath -Recurse -Force -EA 0
+                $comCleaned++
+            }
+        } catch {}
+    }
+    # Limpiar AppIDs
+    Get-ChildItem "HKLM:\SOFTWARE\Classes\AppID" -EA 0 | ForEach-Object {
+        try {
+            $default = (Get-ItemProperty $_.PSPath -EA 0).'(default)'
+            if ($default -match "Microsoft Office") {
+                Remove-Item -Path $_.PSPath -Recurse -Force -EA 0
+                $comCleaned++
+            }
+        } catch {}
+    }
+} catch {}
+Write-Host "  Entradas COM/ActiveX Office eliminadas: $comCleaned" -ForegroundColor Gray
+
+# --- PASO 9: Verificacion final y resumen ---
 Write-Host ""
-Write-Host "[7/8] Verificando limpieza..." -ForegroundColor Yellow
-$remainingOffice = Get-ItemProperty "HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\*","HKLM:\SOFTWARE\WOW6432Node\Microsoft\Windows\CurrentVersion\Uninstall\*" -EA 0 | Where-Object { $_.DisplayName -match "Microsoft Office|Office 365" }
+Write-Host "[9/9] Verificando limpieza..." -ForegroundColor Yellow
+$remainingOffice = Get-ItemProperty "HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\*","HKLM:\SOFTWARE\WOW6432Node\Microsoft\Windows\CurrentVersion\Uninstall\*" -EA 0 | Where-Object { $_.DisplayName -match "Microsoft Office|Office 365|Microsoft 365" }
 if ($remainingOffice) {
     Write-Host "  ADVERTENCIA: Aun quedan entradas de Office en Uninstall:" -ForegroundColor DarkYellow
     $remainingOffice | ForEach-Object { Write-Host "    - $($_.DisplayName)" -ForegroundColor DarkYellow }
+    Write-Host "  Recomendado: reinicia el equipo y vuelve a ejecutar OFFICE FORCE CLEAN." -ForegroundColor Yellow
+    Write-Host "  O usa 'OFFICE TOOL OFICIAL' (SaRA de Microsoft) para limpiezas persistentes." -ForegroundColor Yellow
 } else {
     Write-Host "  OK: No se detectaron instalaciones Office residuales" -ForegroundColor Green
 }
 
-# --- PASO 8: Resumen ---
 Write-Host ""
 Write-Host "========================================" -ForegroundColor Cyan
-Write-Host "  LIMPIEZA COMPLETADA" -ForegroundColor Green
+Write-Host "  LIMPIEZA COMPLETADA (v2.0 AGRESIVA)" -ForegroundColor Green
 Write-Host "========================================" -ForegroundColor Cyan
 Write-Host ""
 Write-Host "  Procesos cerrados:    $killed" -ForegroundColor White
@@ -1990,6 +2143,7 @@ Write-Host "  Instalaciones MSI:    $msiCount" -ForegroundColor White
 Write-Host "  Tareas Office:        $tasksRemoved" -ForegroundColor White
 Write-Host "  Registros limpiados:  $regCleaned" -ForegroundColor White
 Write-Host "  Carpetas eliminadas:  $folderCount (~$freedMB MB)" -ForegroundColor White
+Write-Host "  Entradas COM:         $comCleaned" -ForegroundColor White
 Write-Host ""
 Write-Host "  IMPORTANTE: Reinicia el equipo para completar la limpieza." -ForegroundColor Yellow
 Write-Host ""
@@ -1999,8 +2153,8 @@ Read-Host "Presiona Enter para cerrar"
             # UTF-8 sin BOM para evitar problemas de parseo en PowerShell 5.1
             $utf8NoBom = New-Object System.Text.UTF8Encoding $false
             [System.IO.File]::WriteAllText($scriptPath, $scriptContent, $utf8NoBom)
-            Update-Status "Ejecutando Office Force Clean..." "success"
-            Write-Log "Office Force Clean ejecutado"
+            Update-Status "Ejecutando Office Force Clean v2.0 (agresivo)..." "success"
+            Write-Log "Office Force Clean v2.0 ejecutado"
             Start-Process powershell.exe -ArgumentList "-NoProfile -ExecutionPolicy Bypass -File `"$scriptPath`"" -Verb RunAs
         } catch { Update-Status "Error: $_" "error" }
     }
@@ -2008,19 +2162,36 @@ Read-Host "Presiona Enter para cerrar"
 $OC1.Controls.Add($BtnOC1)
 $OC1.Controls.Add((New-DescLabel -Text "Elimina Office C2R+MSI, registros y archivos" -X 10 -Y 55 -W 228 -H 18))
 
-# Card 2: Official Microsoft Tool
+# Card 2: Official Microsoft Tool - DESCARGA y EJECUTA SetupProd_OffScrub.exe
 $OC2 = New-Card -X 271 -Y $OfficeRemoveY -W 248 -H 90
 $TweakScroll.Controls.Add($OC2)
 $BtnOC2 = New-Btn -Text "OFFICE TOOL OFICIAL" -X 10 -Y 10 -W 228 -H 36 -Color "Secondary"
 $BtnOC2.Add_Click({
-    Update-Status "Abriendo herramienta oficial Microsoft..."
-    try {
-        Start-Process "https://aka.ms/OfficeUninstall"
-        Write-Log "Office official uninstall tool abierto"
-    } catch { Update-Status "Error abriendo herramienta" "error" }
+    $R = [System.Windows.Forms.MessageBox]::Show(
+        "OFFICE TOOL OFICIAL - Microsoft Office Uninstall Tool (SaRA)`n`nSe descargara la herramienta oficial SetupProd_OffScrub.exe desde Microsoft.`nEsta herramienta detecta y elimina cualquier version de Office instalada.`n`nDeseas continuar?",
+        "SHADOWIEX", 4, [System.Windows.Forms.MessageBoxIcon]::Question)
+    if ($R -eq 6) {
+        Update-Status "Descargando Microsoft Office Uninstall Tool..."
+        $saraDest = Join-Path $env:TEMP "SHADOWIEX_SetupProd_OffScrub.exe"
+        try {
+            # aka.ms/SaRA-officeUninstall redirige a outlookdiagnostics.azureedge.net/sarasetup/SetupProd_OffScrub.exe
+            # Usar el shortlink directamente para que Invoke-SafeDownload siga la redireccion 301
+            Invoke-SafeDownload -Url "https://aka.ms/SaRA-officeUninstall" -Destination $saraDest -MinSizeKB 500 -TimeoutSec 120
+            $sz = [math]::Round((Get-Item $saraDest).Length / 1MB, 1)
+            Update-Status "Microsoft Office Uninstall Tool descargado ($sz MB) - ejecutando..." "success"
+            Write-Log "SaRA Office Uninstall Tool descargado y ejecutado"
+            Start-Process $saraDest -Verb RunAs
+        } catch {
+            Update-Status "Descarga fallida - abriendo pagina oficial Microsoft Support..." "warning"
+            Write-Log "SaRA download fallback: $_"
+            if (Test-Path $saraDest) { Remove-Item -Force $saraDest -EA 0 }
+            # Fallback: abrir la pagina oficial de Microsoft Support que tiene el boton de descarga
+            Start-Process "https://support.microsoft.com/en-us/office/uninstall-office-from-a-pc-9dd49b83-264a-477a-8fcc-2fdf5dbf61d8"
+        }
+    }
 })
 $OC2.Controls.Add($BtnOC2)
-$OC2.Controls.Add((New-DescLabel -Text "Abre la herramienta oficial de Microsoft para desinstalar Office" -X 10 -Y 55 -W 228 -H 18))
+$OC2.Controls.Add((New-DescLabel -Text "Descarga y ejecuta SaRA Office Uninstall Tool oficial" -X 10 -Y 55 -W 228 -H 18))
 
 # ============================================================================
 #  CONFIG TAB
