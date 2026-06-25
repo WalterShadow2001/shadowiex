@@ -171,6 +171,46 @@ function Write-Log {
 # ============================================================================
 $Global:MAS_File = $null
 
+# --- Helper de descarga robusta (HttpClient, TLS 1.2/1.3, redirecciones, UA, timeout) ---
+# Se define aqui (al inicio) para estar disponible tanto para MAS como para Office y AV.
+function Invoke-SafeDownload {
+    param(
+        [Parameter(Mandatory=$true)][string]$Url,
+        [Parameter(Mandatory=$true)][string]$Destination,
+        [int]$MinSizeKB = 100,
+        [int]$TimeoutSec = 120
+    )
+    # Asegurar que el directorio destino exista
+    $destDir = Split-Path -Parent $Destination
+    if ($destDir -and -not (Test-Path $destDir)) {
+        New-Item -ItemType Directory -Path $destDir -Force | Out-Null
+    }
+    # Forzar TLS 1.2 y 1.3
+    try { [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12 -bor [Net.SecurityProtocolType]::Tls13 } catch { [Net.ServicePointManager]::SecurityProtocol = 3072 }
+    if (Test-Path $Destination) { Remove-Item -Force $Destination -EA 0 }
+    Add-Type -AssemblyName System.Net.Http -EA 0
+    $handler = New-Object System.Net.Http.HttpClientHandler
+    $handler.AllowAutoRedirect = $true
+    $handler.AutomaticDecompression = [System.Net.DecompressionMethods]::GZip -bor [System.Net.DecompressionMethods]::Deflate
+    $client = New-Object System.Net.Http.HttpClient($handler)
+    $client.Timeout = [TimeSpan]::FromSeconds($TimeoutSec)
+    $client.DefaultRequestHeaders.Add("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 SHADOWIEX/15.0")
+    try {
+        $resp = $client.GetAsync($Url, [System.Net.Http.HttpCompletionOption]::ResponseHeadersRead).Result
+        if (-not $resp.IsSuccessStatusCode) { throw "HTTP $([int]$resp.StatusCode) $($resp.StatusCode)" }
+        $stream = $resp.Content.ReadAsStreamAsync().Result
+        $fs = [System.IO.File]::Create($Destination)
+        $stream.CopyTo($fs)
+        $fs.Close(); $stream.Close()
+        if ((-not (Test-Path $Destination)) -or (Get-Item $Destination).Length -lt ($MinSizeKB * 1KB)) {
+            throw "archivo descargado demasiado pequeno o inexistente"
+        }
+        return $true
+    } finally {
+        $client.Dispose(); $handler.Dispose()
+    }
+}
+
 function Find-MAS {
     if ($Global:MAS_File -and (Test-Path $Global:MAS_File) -and (Get-Item $Global:MAS_File).Length -gt 1KB) { return $Global:MAS_File }
     $searchPaths = @()
@@ -200,25 +240,30 @@ function Deploy-MAS {
     if ($R -eq [System.Windows.Forms.MessageBoxButtons]::Yes) {
         Update-Status "Descargando MAS..."
         try {
-            $url = "https://raw.githubusercontent.com/massgravel/Microsoft-Activation-Scripts/master/MAS/Separate-Files-Version/Activators/MAS_AIO.cmd"
+            # URL actualizada: MAS ahora esta en MAS/All-In-One-Version-KL/MAS_AIO.cmd
+            # (la ruta anterior Separate-Files-Version/Activators/MAS_AIO.cmd ya no existe - 404)
+            $url = "https://raw.githubusercontent.com/massgravel/Microsoft-Activation-Scripts/master/MAS/All-In-One-Version-KL/MAS_AIO.cmd"
             $dest = Join-Path $env:TEMP "SHADOWIEX_MAS.cmd"
-            # Borrar archivo viejo si existe (evita usar archivo corrupto cacheado)
-            if (Test-Path $dest) { Remove-Item -Force $dest }
-            [Net.ServicePointManager]::SecurityProtocol = 3072
-            (New-Object System.Net.WebClient).DownloadFile($url, $dest)
-            # Verificar que el archivo se descargo correctamente (>1KB)
-            if ((Test-Path $dest) -and (Get-Item $dest).Length -gt 1KB) {
-                $Global:MAS_File = $dest
-                Update-Status "MAS descargado ($( [math]::Round((Get-Item $dest).Length/1KB, 1) ) KB)" "success"
-                Write-Log "MAS descargado a $dest"
-                return $dest
-            } else {
-                Update-Status "Error: descarga incompleta o fallida" "error"
-                Write-Log "Error: MAS descarga incompleta"
-                if (Test-Path $dest) { Remove-Item -Force $dest }
-                return $null
+            Invoke-SafeDownload -Url $url -Destination $dest -MinSizeKB 50 -TimeoutSec 60
+            # Validacion extra: el archivo MAS_AIO.cmd debe contener la marca deMAS
+            $content = Get-Content $dest -Raw -EA 0
+            if (-not $content -or $content -notmatch "MAS AIO") {
+                throw "el archivo descargado no parece ser MAS_AIO.cmd valido"
             }
-        } catch { Update-Status "Error descargando MAS: $_" "error"; return $null }
+            $Global:MAS_File = $dest
+            Update-Status "MAS descargado ($( [math]::Round((Get-Item $dest).Length/1KB, 1) ) KB)" "success"
+            Write-Log "MAS descargado a $dest"
+            return $dest
+        } catch {
+            Update-Status "Error descargando MAS: $_" "error"
+            Write-Log "Error MAS: $_ - abriendo navegador como fallback"
+            # Fallback: abrir la pagina de descargas oficial de MAS
+            [System.Windows.Forms.MessageBox]::Show(
+                "No se pudo descargar MAS automaticamente.`n`nSe abrira la pagina oficial de descargas de MAS en tu navegador.`nDescarga MAS_AIO.cmd y colocalo junto a Shadowiex.ps1 o en Descargas.",
+                "SHADOWIEX - MAS no disponible", 0, [System.Windows.Forms.MessageBoxIcon]::Warning) | Out-Null
+            Start-Process "https://massgrave.dev/genuine-installation-media.html"
+            return $null
+        }
     }
     return $null
 }
@@ -1284,18 +1329,24 @@ foreach ($Ver in $OfficeDownloads.Keys) {
         $DLBtn.Add_Click({
             $Url = "https://c2rsetup.officeapps.live.com/c2r/download.aspx?ProductreleaseID=$($DL_PID)&platform=x64&language=es-mx&version=O16GA"
             $DestPath = Join-Path $Global:DownloadPath "$($DL_PID)_x64_es-mx.exe"
-            Update-Status "Descargando $($DL_Name)..."
+            Update-Status "Descargando $($DL_Name) (~7 MB)..."
             Write-Log "Descarga Office: $($DL_Name) ($($DL_PID))"
             try {
-                [System.Net.ServicePointManager]::SecurityProtocol = [System.Net.SecurityProtocolType]::Tls12
-                $WC = New-Object System.Net.WebClient
-                $WC.DownloadFile($Url, $DestPath)
-                Update-Status "Descargado: $($DL_Name) - ejecutando..." "success"
-                Write-Log "Ejecutando: $DestPath"
+                # Usar helper robusto: maneja redirecciones HTTP 302, TLS 1.2/1.3 y verifica tamano minimo
+                # El instalador C2R pesa ~7MB; exigimos al menos 5MB para detectar descargas truncadas
+                Invoke-SafeDownload -Url $Url -Destination $DestPath -MinSizeKB 5120 -TimeoutSec 180
+                $sz = [math]::Round((Get-Item $DestPath).Length / 1MB, 1)
+                Update-Status "Descargado: $($DL_Name) ($sz MB) - ejecutando..." "success"
+                Write-Log "Ejecutando: $DestPath ($sz MB)"
                 Start-Process $DestPath -Verb RunAs
             } catch {
-                Update-Status "Error descargando $($DL_Name)" "error"
-                [System.Windows.Forms.MessageBox]::Show("Error al descargar:`n$($_.Exception.Message)", "SHADOWIEX - Error")
+                Update-Status "Descarga directa fallida - abriendo navegador..." "warning"
+                Write-Log "Office download fallback: $_"
+                # Limpiar archivo corrupto si quedo
+                if (Test-Path $DestPath) { Remove-Item -Force $DestPath -EA 0 }
+                $msg = "No se pudo descargar $($DL_Name) automaticamente.`n`nRazon: $_`n`nSe abrira la pagina oficial de Microsoft en tu navegador para que descargues Office manualmente.`n`nTambien puedes usar la herramienta 'OFFICE TOOL OFICIAL' de la pestania OPTIMIZAR."
+                [System.Windows.Forms.MessageBox]::Show($msg, "SHADOWIEX - Error descarga Office", 0, [System.Windows.Forms.MessageBoxIcon]::Warning) | Out-Null
+                Start-Process $Url
             }
         }.GetNewClosure())
         $Card.Controls.Add($DLBtn)
@@ -1521,40 +1572,8 @@ $AVSectionY = if ($TCol -eq 0) { $TweakY } else { $TweakY + 98 }
 $AVSectionY += 15
 $TweakScroll.Controls.Add((New-SectionTitle -Text "REMOVER ANTIVIRUS (DESINSTALACION FORZADA)" -X 15 -Y $AVSectionY))
 
-# --- Helper interno: descarga robusta con HttpClient (maneja redirecciones, TLS 1.2/1.3, timeouts) ---
-function Invoke-SafeDownload {
-    param(
-        [Parameter(Mandatory=$true)][string]$Url,
-        [Parameter(Mandatory=$true)][string]$Destination,
-        [int]$MinSizeKB = 100,
-        [int]$TimeoutSec = 60
-    )
-    # Forzar TLS 1.2 y 1.3 (puede que algunos hosts solo soporten 1.2)
-    try { [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12 -bor [Net.SecurityProtocolType]::Tls13 } catch { [Net.ServicePointManager]::SecurityProtocol = 3072 }
-    if (Test-Path $Destination) { Remove-Item -Force $Destination -EA 0 }
-    # Usar HttpClient para mejor manejo de redirecciones y UA
-    Add-Type -AssemblyName System.Net.Http -EA 0
-    $handler = New-Object System.Net.Http.HttpClientHandler
-    $handler.AllowAutoRedirect = $true
-    $handler.AutomaticDecompression = [System.Net.DecompressionMethods]::GZip -bor [System.Net.DecompressionMethods]::Deflate
-    $client = New-Object System.Net.Http.HttpClient($handler)
-    $client.Timeout = [TimeSpan]::FromSeconds($TimeoutSec)
-    $client.DefaultRequestHeaders.Add("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) SHADOWIEX/15.0")
-    try {
-        $resp = $client.GetAsync($Url).Result
-        if (-not $resp.IsSuccessStatusCode) { throw "HTTP $([int]$resp.StatusCode) $($resp.StatusCode)" }
-        $stream = $resp.Content.ReadAsStreamAsync().Result
-        $fs = [System.IO.File]::Create($Destination)
-        $stream.CopyTo($fs)
-        $fs.Close(); $stream.Close()
-        if ((-not (Test-Path $Destination)) -or (Get-Item $Destination).Length -lt ($MinSizeKB * 1KB)) {
-            throw "archivo descargado demasiado pequeno o inexistente"
-        }
-        return $true
-    } finally {
-        $client.Dispose(); $handler.Dispose()
-    }
-}
+# Invoke-SafeDownload ya esta definido al inicio del script (seccion MAS).
+# Se reutiliza para todas las descargas de antivirus.
 
 $AVTools = @(
     @{Name="AVAST CLEAR"; Desc="Desinstalacion forzada de Avast (Modo Seguro recomendado)"; Color="Danger"; Action={
