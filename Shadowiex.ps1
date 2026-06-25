@@ -1259,10 +1259,25 @@ $InstallRightPanel.Controls.Add($InstallBtn)
 $DlY = 126
 $InstallRightPanel.Controls.Add((New-SectionTitle -Text "OFFICE C2R - ESPANOL MEXICO" -X 15 -Y $DlY -W 400))
 $DlY += 24
-$InstallRightPanel.Controls.Add((New-DescLabel -Text "Enlaces oficiales Microsoft via massgrave.dev (es-MX)" -X 15 -Y $DlY -W 460))
+
+# Detectar arquitectura del SO una sola vez al cargar la UI
+# Considerar arquitectura del proceso (si PS es x86 en SO x64, usar el SO real)
+try {
+    $osArc = (Get-CimInstance Win32_OperatingSystem -EA 0).OSArchitecture
+    if (-not $osArc) { $osArc = $env:PROCESSOR_ARCHITECTURE }
+} catch { $osArc = $env:PROCESSOR_ARCHITECTURE }
+# Determinar plataforma para Microsoft C2R: x64 o x86
+if ($osArc -match '64' -or $env:PROCESSOR_ARCHITECTURE -match 'AMD64|EM64T|x64') {
+    $Global:OfficePlatform = 'x64'
+    $arcLabel = '64 bits'
+} else {
+    $Global:OfficePlatform = 'x86'
+    $arcLabel = '32 bits'
+}
+$InstallRightPanel.Controls.Add((New-DescLabel -Text "Enlaces oficiales Microsoft (es-MX) - Auto-detectado: $arcLabel" -X 15 -Y $DlY -W 460))
 $DlY += 22
 
-# Datos de Office organizados por version (solo x64, los mas utiles)
+# Datos de Office organizados por version (la plataforma se resuelve al hacer clic)
 $OfficeDownloads = @{
     "Microsoft 365" = @(
         @{Name="Microsoft 365 Apps (ProPlus)"; PID="O365ProPlusRetail"},
@@ -1327,22 +1342,43 @@ foreach ($Ver in $OfficeDownloads.Keys) {
         $DLBtn = New-Btn -Text "DESCARGAR" -X 375 -Y 2 -W 88 -H 28 -Color "Primary"
         $DLBtn.Font = $Global:Fonts.Small
         $DLBtn.Add_Click({
-            $Url = "https://c2rsetup.officeapps.live.com/c2r/download.aspx?ProductreleaseID=$($DL_PID)&platform=x64&language=es-mx&version=O16GA"
-            $DestPath = Join-Path $Global:DownloadPath "$($DL_PID)_x64_es-mx.exe"
-            Update-Status "Descargando $($DL_Name) (~7 MB)..."
-            Write-Log "Descarga Office: $($DL_Name) ($($DL_PID))"
+            # Plataforma detectada al cargar la UI (x64 o x86 segun SO real)
+            $plat = $Global:OfficePlatform
+            if (-not $plat) { $plat = 'x64' } # fallback defensivo
+            $Url = "https://c2rsetup.officeapps.live.com/c2r/download.aspx?ProductreleaseID=$($DL_PID)&platform=$plat&language=es-mx&version=O16GA"
+            $DestPath = Join-Path $Global:DownloadPath "$($DL_PID)_$($plat)_es-mx.exe"
+            Update-Status "Descargando $($DL_Name) ($($plat.ToUpper())) (~7 MB)..."
+            Write-Log "Descarga Office: $($DL_Name) ($($DL_PID)) plataforma=$plat"
             try {
                 # Usar helper robusto: maneja redirecciones HTTP 302, TLS 1.2/1.3 y verifica tamano minimo
                 # El instalador C2R pesa ~7MB; exigimos al menos 5MB para detectar descargas truncadas
                 Invoke-SafeDownload -Url $Url -Destination $DestPath -MinSizeKB 5120 -TimeoutSec 180
                 $sz = [math]::Round((Get-Item $DestPath).Length / 1MB, 1)
-                Update-Status "Descargado: $($DL_Name) ($sz MB) - ejecutando..." "success"
+                Update-Status "Descargado: $($DL_Name) ($sz MB, $($plat.ToUpper())) - ejecutando..." "success"
                 Write-Log "Ejecutando: $DestPath ($sz MB)"
                 Start-Process $DestPath -Verb RunAs
             } catch {
-                Update-Status "Descarga directa fallida - abriendo navegador..." "warning"
-                Write-Log "Office download fallback: $_"
-                # Limpiar archivo corrupto si quedo
+                Update-Status "Descarga $plat fallida - intentando x86 como fallback..." "warning"
+                Write-Log "Office download $plat fallback: $_"
+                # Si fallo x64 y el SO es 64-bit, intentar con x86 como medida de gracia
+                # (algunos equipos antiguos tienen problemas con el instalador x64)
+                if ($plat -eq 'x64') {
+                    if (Test-Path $DestPath) { Remove-Item -Force $DestPath -EA 0 }
+                    $Url86 = "https://c2rsetup.officeapps.live.com/c2r/download.aspx?ProductreleaseID=$($DL_PID)&platform=x86&language=es-mx&version=O16GA"
+                    $DestPath86 = Join-Path $Global:DownloadPath "$($DL_PID)_x86_es-mx.exe"
+                    try {
+                        Invoke-SafeDownload -Url $Url86 -Destination $DestPath86 -MinSizeKB 5120 -TimeoutSec 180
+                        $sz = [math]::Round((Get-Item $DestPath86).Length / 1MB, 1)
+                        Update-Status "Descargado: $($DL_Name) ($sz MB, X86 fallback) - ejecutando..." "success"
+                        Write-Log "Ejecutando (fallback x86): $DestPath86 ($sz MB)"
+                        Start-Process $DestPath86 -Verb RunAs
+                        return
+                    } catch {
+                        Write-Log "Office x86 fallback tambien fallo: $_"
+                        if (Test-Path $DestPath86) { Remove-Item -Force $DestPath86 -EA 0 }
+                    }
+                }
+                # Si llegamos aqui, ambas rutas fallaron o el SO era x86
                 if (Test-Path $DestPath) { Remove-Item -Force $DestPath -EA 0 }
                 $msg = "No se pudo descargar $($DL_Name) automaticamente.`n`nRazon: $_`n`nSe abrira la pagina oficial de Microsoft en tu navegador para que descargues Office manualmente.`n`nTambien puedes usar la herramienta 'OFFICE TOOL OFICIAL' de la pestania OPTIMIZAR."
                 [System.Windows.Forms.MessageBox]::Show($msg, "SHADOWIEX - Error descarga Office", 0, [System.Windows.Forms.MessageBoxIcon]::Warning) | Out-Null
