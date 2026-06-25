@@ -311,7 +311,7 @@ function Invoke-OfficePreClean {
                 $uninstallStr = $_.UninstallString
                 $binaryExists = $false
                 if ($uninstallStr) {
-                    if ($uninstallStr -match "^\"?([^\"]+)\"?") {
+                    if ($uninstallStr -match '^"?([^"]+)"?') {
                         $binPath = $Matches[1]
                         if (Test-Path $binPath) { $binaryExists = $true }
                     }
