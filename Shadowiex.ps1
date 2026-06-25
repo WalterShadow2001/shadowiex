@@ -877,26 +877,29 @@ foreach ($Tool in $RepairTools) {
 # ============================================================================
 #  INSTALAR TAB
 # ============================================================================
-# Usar un SplitContainer para que el panel izquierdo y derecho se redimensionen
-# proporcionalmente al cambiar el tamano de la ventana.
-$InstallSplit = New-Object System.Windows.Forms.SplitContainer
-$InstallSplit.Dock = [System.Windows.Forms.DockStyle]::Fill
-$InstallSplit.BackColor = $Global:Theme.BG
-# Minimos seguros - se ajustaran cuando la ventana tenga ancho real
-$InstallSplit.Panel1MinSize = 200
-$InstallSplit.Panel2MinSize = 200
-$InstallSplit.FixedPanel = [System.Windows.Forms.FixedPanel]::None
-$InstallSplit.SplitterWidth = 5
-# NO fijar SplitterDistance aqui: el control aun no tiene ancho asignado
-# y dispararia 'SplitterDistance debe estar entre Panel1MinSize y Ancho - Panel2MinSize'
-# Se calcula en el evento Shown del formulario
-$TabInstall.Controls.Add($InstallSplit)
+# Usar un TableLayoutPanel con 2 columnas porcentuales en lugar de SplitContainer.
+# El SplitContainer dispara excepciones al asignar MinSize/SplitterDistance antes
+# de que el control tenga ancho real. TableLayoutPanel no tiene este problema.
+$InstallLayout = New-Object System.Windows.Forms.TableLayoutPanel
+$InstallLayout.Dock = [System.Windows.Forms.DockStyle]::Fill
+$InstallLayout.BackColor = $Global:Theme.BG
+$InstallLayout.ColumnCount = 2
+$InstallLayout.RowCount = 1
+# Columna 1 (izq, gestor paquetes) = 52%, Columna 2 (der, descargas Office) = 48%
+$InstallLayout.ColumnStyles.Add((New-Object System.Windows.Forms.ColumnStyle([System.Windows.Forms.SizeType]::Percent, 52)))
+$InstallLayout.ColumnStyles.Add((New-Object System.Windows.Forms.ColumnStyle([System.Windows.Forms.SizeType]::Percent, 48)))
+$InstallLayout.RowStyles.Add((New-Object System.Windows.Forms.RowStyle([System.Windows.Forms.SizeType]::Percent, 100)))
+# Sin margenes para que ocupen todo
+$InstallLayout.Padding = New-Object System.Windows.Forms.Padding(0, 0, 0, 0)
+$InstallLayout.Margin = New-Object System.Windows.Forms.Padding(0, 0, 0, 0)
+$TabInstall.Controls.Add($InstallLayout)
 
 $InstallLeftPanel = New-Object System.Windows.Forms.Panel
 $InstallLeftPanel.Dock = [System.Windows.Forms.DockStyle]::Fill
 $InstallLeftPanel.AutoScroll = $true
 $InstallLeftPanel.BackColor = $Global:Theme.BG
-$InstallSplit.Panel1.Controls.Add($InstallLeftPanel)
+$InstallLeftPanel.Padding = New-Object System.Windows.Forms.Padding(0, 0, 2, 0)
+$InstallLayout.Controls.Add($InstallLeftPanel, 0, 0)
 
 $InstallLeftPanel.Controls.Add((New-SectionTitle -Text "GESTOR DE PAQUETES" -X 10 -Y 5 -W 300))
 
@@ -1094,7 +1097,8 @@ $InstallRightPanel = New-Object System.Windows.Forms.Panel
 $InstallRightPanel.Dock = [System.Windows.Forms.DockStyle]::Fill
 $InstallRightPanel.AutoScroll = $true
 $InstallRightPanel.BackColor = $Global:Theme.Surface
-$InstallSplit.Panel2.Controls.Add($InstallRightPanel)
+$InstallRightPanel.Padding = New-Object System.Windows.Forms.Padding(2, 0, 0, 0)
+$InstallLayout.Controls.Add($InstallRightPanel, 1, 0)
 
 $InstallRightPanel.Controls.Add((New-SectionTitle -Text "ACCIONES" -X 15 -Y 10 -W 200))
 
@@ -2143,32 +2147,14 @@ $Global:Form.Add_Resize({
     try {
         # El header usa Dock=Top y sus labels ya estan anclados (Anchor)
         # con Top+Right, asi que se reposicionan automaticamente.
-        # Forzar repintado del header por si acaso.
         if ($HeaderPanel) { $HeaderPanel.Invalidate() }
-        # El TabControl usa Dock=Fill - se ajusta solo.
-        # El SplitContainer del tab INSTALAR usa Dock=Fill - se ajusta solo.
-        # Los ScrollPanels de cada pestania usan Dock=Fill - se ajustan solos.
+        # TableLayoutPanel y todos los paneles con Dock=Fill se ajustan automaticamente.
     } catch {}
 })
 
-# Evento Shown: se dispara cuando la ventana ya esta visible y tiene tamano real
-# Aqui ya podemos fijar el SplitterDistance del SplitContainer con seguridad
+# Evento Shown: forzar repintado cuando la ventana ya esta visible
 $Global:Form.Add_Shown({
     try {
-        # Esperar un instante a que el layout se estabilice
-        Start-Sleep -Milliseconds 50
-        # Fijar SplitterDistance al ~52% del ancho del SplitContainer
-        # Respetando los minimos de Panel1 (200) y Panel2 (200)
-        if ($InstallSplit -and $InstallSplit.Width -gt 0) {
-            $total = $InstallSplit.Width
-            $desired = [int]($total * 0.52)
-            $maxAllowed = $total - $InstallSplit.Panel2MinSize - $InstallSplit.SplitterWidth
-            $minAllowed = $InstallSplit.Panel1MinSize
-            if ($desired -lt $minAllowed) { $desired = $minAllowed }
-            if ($desired -gt $maxAllowed) { $desired = $maxAllowed }
-            $InstallSplit.SplitterDistance = $desired
-        }
-        # Forzar repintado final
         $Global:Form.Refresh()
     } catch {}
 })
