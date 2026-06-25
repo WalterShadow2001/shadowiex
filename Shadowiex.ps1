@@ -1516,6 +1516,165 @@ foreach ($T in $TweaksList) {
     if ($TCol -ge 4) { $TCol = 0; $TweakX = 15; $TweakY += 98 } else { $TweakX += 256 }
 }
 
+# --- Seccion: REMOVER ANTIVIRUS ---
+$AVSectionY = if ($TCol -eq 0) { $TweakY } else { $TweakY + 98 }
+$AVSectionY += 15
+$TweakScroll.Controls.Add((New-SectionTitle -Text "REMOVER ANTIVIRUS (DESINSTALACION FORZADA)" -X 15 -Y $AVSectionY))
+
+$AVTools = @(
+    @{Name="AVAST CLEAR"; Desc="Desinstalacion forzada de Avast (requiere Modo Seguro)"; Color="Danger"; Action={
+        $R = [System.Windows.Forms.MessageBox]::Show(
+            "AVAST CLEAR - Desinstalador oficial forzado`n`nAVISO: Este proceso eliminara completamente Avast/AVG del sistema.`nSe recomienda reiniciar en Modo Seguro antes de ejecutar.`n`nDeseas continuar?",
+            "SHADOWIEX", 4, [System.Windows.Forms.MessageBoxIcon]::Warning)
+        if ($R -eq 6) {
+            Update-Status "Descargando Avast Clear..."
+            try {
+                $avUrl = "https://files.avast.com/files/avast_clear.exe"
+                $avDest = Join-Path $env:TEMP "SHADOWIEX_avast_clear.exe"
+                if (Test-Path $avDest) { Remove-Item -Force $avDest }
+                [Net.ServicePointManager]::SecurityProtocol = 3072
+                (New-Object System.Net.WebClient).DownloadFile($avUrl, $avDest)
+                if ((Test-Path $avDest) -and (Get-Item $avDest).Length -gt 100KB) {
+                    Update-Status "Avast Clear descargado - ejecutando..." "success"
+                    Write-Log "Avast Clear ejecutado"
+                    Start-Process $avDest -Verb RunAs
+                } else {
+                    Update-Status "Error: descarga de Avast Clear fallida" "error"
+                    if (Test-Path $avDest) { Remove-Item -Force $avDest }
+                }
+            } catch { Update-Status "Error descargando Avast Clear: $_" "error" }
+        }
+    }},
+    @{Name="AVG CLEAR"; Desc="Desinstalacion forzada de AVG Antivirus"; Color="Danger"; Action={
+        $R = [System.Windows.Forms.MessageBox]::Show(
+            "AVG CLEAR - Desinstalador oficial forzado`n`nAVISO: Este proceso eliminara completamente AVG del sistema.`nSe recomienda reiniciar en Modo Seguro antes de ejecutar.`n`nDeseas continuar?",
+            "SHADOWIEX", 4, [System.Windows.Forms.MessageBoxIcon]::Warning)
+        if ($R -eq 6) {
+            Update-Status "Descargando AVG Clear..."
+            try {
+                $avgUrl = "https://files.avast.com/files/avast_clear.exe"
+                $avgDest = Join-Path $env:TEMP "SHADOWIEX_avg_clear.exe"
+                if (Test-Path $avgDest) { Remove-Item -Force $avgDest }
+                [Net.ServicePointManager]::SecurityProtocol = 3072
+                (New-Object System.Net.WebClient).DownloadFile($avgUrl, $avgDest)
+                if ((Test-Path $avgDest) -and (Get-Item $avgDest).Length -gt 100KB) {
+                    Update-Status "AVG Clear descargado - ejecutando..." "success"
+                    Write-Log "AVG Clear ejecutado"
+                    Start-Process $avgDest -Verb RunAs
+                } else {
+                    Update-Status "Error: descarga de AVG Clear fallida" "error"
+                    if (Test-Path $avgDest) { Remove-Item -Force $avgDest }
+                }
+            } catch { Update-Status "Error descargando AVG Clear: $_" "error" }
+        }
+    }},
+    @{Name="MCAFEE MCPR"; Desc="McAfee Consumer Product Removal Tool"; Color="Danger"; Action={
+        $R = [System.Windows.Forms.MessageBox]::Show(
+            "MCAFEE MCPR - Herramienta de remocion oficial`n`nEste proceso eliminara completamente McAfee del sistema.`n`nDeseas continuar?",
+            "SHADOWIEX", 4, [System.Windows.Forms.MessageBoxIcon]::Warning)
+        if ($R -eq 6) {
+            Update-Status "Descargando McAfee MCPR..."
+            try {
+                $mcUrl = "https://download.mcafee.com/molbin/aff/landingpages/mcpr/MCPR.exe"
+                $mcDest = Join-Path $env:TEMP "SHADOWIEX_MCPR.exe"
+                if (Test-Path $mcDest) { Remove-Item -Force $mcDest }
+                [Net.ServicePointManager]::SecurityProtocol = 3072
+                (New-Object System.Net.WebClient).DownloadFile($mcUrl, $mcDest)
+                if ((Test-Path $mcDest) -and (Get-Item $mcDest).Length -gt 100KB) {
+                    Update-Status "McAfee MCPR descargado - ejecutando..." "success"
+                    Write-Log "McAfee MCPR ejecutado"
+                    Start-Process $mcDest -Verb RunAs
+                } else {
+                    Update-Status "Error: descarga de McAfee MCPR fallida" "error"
+                    if (Test-Path $mcDest) { Remove-Item -Force $mcDest }
+                }
+            } catch { Update-Status "Error descargando McAfee MCPR: $_" "error" }
+        }
+    }},
+    @{Name="KASPERSKY REMOVE"; Desc="kavremover - Herramienta oficial de Kaspersky"; Color="Danger"; Action={
+        $R = [System.Windows.Forms.MessageBox]::Show(
+            "KASPERSKY KAVREMOVER - Herramienta de remocion oficial`n`nEste proceso eliminara completamente Kaspersky del sistema.`nPuede requerir reinicio.`n`nDeseas continuar?",
+            "SHADOWIEX", 4, [System.Windows.Forms.MessageBoxIcon]::Warning)
+        if ($R -eq 6) {
+            Update-Status "Descargando Kaspersky kavremover..."
+            try {
+                $ksUrl = "https://media.kaspersky.com/utilities/VirusUtilities/EN/kavremover.exe"
+                $ksDest = Join-Path $env:TEMP "SHADOWIEX_kavremover.exe"
+                if (Test-Path $ksDest) { Remove-Item -Force $ksDest }
+                [Net.ServicePointManager]::SecurityProtocol = 3072
+                (New-Object System.Net.WebClient).DownloadFile($ksUrl, $ksDest)
+                if ((Test-Path $ksDest) -and (Get-Item $ksDest).Length -gt 100KB) {
+                    Update-Status "Kaspersky kavremover descargado - ejecutando..." "success"
+                    Write-Log "Kaspersky kavremover ejecutado"
+                    Start-Process $ksDest -Verb RunAs
+                } else {
+                    Update-Status "Error: descarga de kavremover fallida" "error"
+                    if (Test-Path $ksDest) { Remove-Item -Force $ksDest }
+                }
+            } catch { Update-Status "Error descargando kavremover: $_" "error" }
+        }
+    }},
+    @{Name="NORTON REMOVE"; Desc="Norton Remove and Reinstall Tool"; Color="Danger"; Action={
+        $R = [System.Windows.Forms.MessageBox]::Show(
+            "NORTON REMOVE AND REINSTALL - Herramienta oficial`n`nEste proceso eliminara completamente Norton del sistema.`n`nDeseas continuar?",
+            "SHADOWIEX", 4, [System.Windows.Forms.MessageBoxIcon]::Warning)
+        if ($R -eq 6) {
+            Update-Status "Descargando Norton Remove..."
+            try {
+                $nrUrl = "https://service.symantec.com/EXTERNAL/fresh/dispatch-main/v1/asset/nrntool/latest"
+                $nrDest = Join-Path $env:TEMP "SHADOWIEX_Norton_Removal.exe"
+                if (Test-Path $nrDest) { Remove-Item -Force $nrDest }
+                [Net.ServicePointManager]::SecurityProtocol = 3072
+                (New-Object System.Net.WebClient).DownloadFile($nrUrl, $nrDest)
+                if ((Test-Path $nrDest) -and (Get-Item $nrDest).Length -gt 100KB) {
+                    Update-Status "Norton Remove descargado - ejecutando..." "success"
+                    Write-Log "Norton Remove ejecutado"
+                    Start-Process $nrDest -Verb RunAs
+                } else {
+                    Update-Status "Error: descarga de Norton Remove fallida" "error"
+                    if (Test-Path $nrDest) { Remove-Item -Force $nrDest }
+                }
+            } catch { Update-Status "Error descargando Norton Remove: $_" "error" }
+        }
+    }},
+    @{Name="ESET REMOVER"; Desc="ESET Uninstaller Tool oficial"; Color="Danger"; Action={
+        $R = [System.Windows.Forms.MessageBox]::Show(
+            "ESET UNINSTALLER - Herramienta de remocion oficial`n`nEste proceso eliminara completamente productos ESET del sistema.`nPuede requerir reinicio en Modo Seguro.`n`nDeseas continuar?",
+            "SHADOWIEX", 4, [System.Windows.Forms.MessageBoxIcon]::Warning)
+        if ($R -eq 6) {
+            Update-Status "Descargando ESET Uninstaller..."
+            try {
+                $esUrl = "https://download.eset.com/com/eset/tools/uninstaller/ESETUninstaller.exe"
+                $esDest = Join-Path $env:TEMP "SHADOWIEX_ESET_Uninstaller.exe"
+                if (Test-Path $esDest) { Remove-Item -Force $esDest }
+                [Net.ServicePointManager]::SecurityProtocol = 3072
+                (New-Object System.Net.WebClient).DownloadFile($esUrl, $esDest)
+                if ((Test-Path $esDest) -and (Get-Item $esDest).Length -gt 100KB) {
+                    Update-Status "ESET Uninstaller descargado - ejecutando..." "success"
+                    Write-Log "ESET Uninstaller ejecutado"
+                    Start-Process $esDest -Verb RunAs
+                } else {
+                    Update-Status "Error: descarga de ESET Uninstaller fallida" "error"
+                    if (Test-Path $esDest) { Remove-Item -Force $esDest }
+                }
+            } catch { Update-Status "Error descargando ESET Uninstaller: $_" "error" }
+        }
+    }}
+)
+
+$AVY = $AVSectionY + 30; $AVX = 15; $AVCol = 0
+foreach ($AV in $AVTools) {
+    $Card = New-Card -X $AVX -Y $AVY -W 248 -H 90
+    $TweakScroll.Controls.Add($Card)
+    $Btn = New-Btn -Text $AV.Name -X 10 -Y 10 -W 228 -H 36 -Color $AV.Color
+    $CurrAVAction = $AV.Action
+    $Btn.Add_Click({ & $CurrAVAction }.GetNewClosure())
+    $Card.Controls.Add($Btn)
+    $Card.Controls.Add((New-DescLabel -Text $AV.Desc -X 10 -Y 55 -W 228 -H 18))
+    $AVCol++
+    if ($AVCol -ge 4) { $AVCol = 0; $AVX = 15; $AVY += 98 } else { $AVX += 256 }
+}
+
 # ============================================================================
 #  CONFIG TAB
 # ============================================================================
