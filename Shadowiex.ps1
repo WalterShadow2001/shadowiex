@@ -74,7 +74,7 @@ if (-not $isAdmin) {
     if ($scriptPath) {
         Start-Process powershell.exe "-NoProfile -ExecutionPolicy Bypass -File `"$scriptPath`"" -Verb RunAs
     } else {
-        Start-Process powershell.exe "-NoProfile -ExecutionPolicy Bypass -Command `"irm n9.cl/shadowiex | iex`"" -Verb RunAs
+        Start-Process powershell.exe "-NoProfile -ExecutionPolicy Bypass -Command `"irm https://raw.githubusercontent.com/WalterShadow2001/shadowiex/main/Shadowiex.ps1 | iex`"" -Verb RunAs
     }
     exit
 }
