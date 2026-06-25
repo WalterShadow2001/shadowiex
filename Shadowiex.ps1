@@ -882,12 +882,14 @@ foreach ($Tool in $RepairTools) {
 $InstallSplit = New-Object System.Windows.Forms.SplitContainer
 $InstallSplit.Dock = [System.Windows.Forms.DockStyle]::Fill
 $InstallSplit.BackColor = $Global:Theme.BG
-# Panel1 (izq) ~52%, Panel2 (der) ~48% - ratio fijo pero se estira con la ventana
-$InstallSplit.SplitterDistance = 560
-$InstallSplit.Panel1MinSize = 400
-$InstallSplit.Panel2MinSize = 350
+# Minimos seguros - se ajustaran cuando la ventana tenga ancho real
+$InstallSplit.Panel1MinSize = 200
+$InstallSplit.Panel2MinSize = 200
 $InstallSplit.FixedPanel = [System.Windows.Forms.FixedPanel]::None
 $InstallSplit.SplitterWidth = 5
+# NO fijar SplitterDistance aqui: el control aun no tiene ancho asignado
+# y dispararia 'SplitterDistance debe estar entre Panel1MinSize y Ancho - Panel2MinSize'
+# Se calcula en el evento Shown del formulario
 $TabInstall.Controls.Add($InstallSplit)
 
 $InstallLeftPanel = New-Object System.Windows.Forms.Panel
@@ -2146,6 +2148,28 @@ $Global:Form.Add_Resize({
         # El TabControl usa Dock=Fill - se ajusta solo.
         # El SplitContainer del tab INSTALAR usa Dock=Fill - se ajusta solo.
         # Los ScrollPanels de cada pestania usan Dock=Fill - se ajustan solos.
+    } catch {}
+})
+
+# Evento Shown: se dispara cuando la ventana ya esta visible y tiene tamano real
+# Aqui ya podemos fijar el SplitterDistance del SplitContainer con seguridad
+$Global:Form.Add_Shown({
+    try {
+        # Esperar un instante a que el layout se estabilice
+        Start-Sleep -Milliseconds 50
+        # Fijar SplitterDistance al ~52% del ancho del SplitContainer
+        # Respetando los minimos de Panel1 (200) y Panel2 (200)
+        if ($InstallSplit -and $InstallSplit.Width -gt 0) {
+            $total = $InstallSplit.Width
+            $desired = [int]($total * 0.52)
+            $maxAllowed = $total - $InstallSplit.Panel2MinSize - $InstallSplit.SplitterWidth
+            $minAllowed = $InstallSplit.Panel1MinSize
+            if ($desired -lt $minAllowed) { $desired = $minAllowed }
+            if ($desired -gt $maxAllowed) { $desired = $maxAllowed }
+            $InstallSplit.SplitterDistance = $desired
+        }
+        # Forzar repintado final
+        $Global:Form.Refresh()
     } catch {}
 })
 
