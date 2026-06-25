@@ -211,6 +211,143 @@ function Invoke-SafeDownload {
     }
 }
 
+# --- Pre-limpieza de Office antes de instalar ---
+# Evita los errores 30183-44 (400) y 0-2031 (17004) que ocurren cuando:
+# - Hay restos de instalaciones previas de Office
+# - El servicio ClickToRun esta bloqueado o corrupto
+# - Hay archivos XML de configuracion corruptos
+# - Hay un paquete ClickToRun pendiente a medio instalar
+function Invoke-OfficePreClean {
+    param([string]$PidBeingInstalled = "")
+    $cleanLog = @()
+
+    # 1. Matar procesos de Office que puedan bloquear la instalacion
+    try {
+        $procs = @("WINWORD","EXCEL","OUTLOOK","POWERPNT","MSACCESS","ONENOTE","CLICKTORUN",
+                   "OFFICEC2RCLIENT","OFFICETELEMETRY","MSOSYNC","GROOVE","ONEDRIVE","MSPUB","MOC")
+        foreach ($p in $procs) {
+            try { $null = & taskkill /F /IM "$p.exe" 2>$null } catch {}
+        }
+        $cleanLog += "Procesos Office cerrados"
+    } catch {}
+
+    # 2. Detener y reiniciar el servicio ClickToRun (si existe y esta corrupto)
+    try {
+        $c2rSvc = Get-Service -Name "ClickToRunSvc" -EA 0
+        if ($c2rSvc) {
+            if ($c2rSvc.Status -eq 'Running') {
+                try { Stop-Service -Name "ClickToRunSvc" -Force -EA 0 } catch {}
+                Start-Sleep -Seconds 2
+            }
+            $cleanLog += "Servicio ClickToRun detenido"
+        }
+    } catch {}
+
+    # 3. Eliminar el archivo ClickToRunPackageLocker (causa error 30183-44 cuando esta corrupto)
+    try {
+        $lockerPaths = @(
+            "$env:ProgramData\Microsoft\Office\ClickToRunPackageLocker",
+            "$env:ProgramData\Microsoft\Office\ClickToRun\Locker",
+            "$env:ProgramData\Microsoft\ClickToRun\Locker",
+            "$env:LOCALAPPDATA\Microsoft\Office\ClickToRunPackageLocker"
+        )
+        foreach ($lp in $lockerPaths) {
+            if (Test-Path $lp) {
+                Remove-Item -Path $lp -Force -Recurse -EA 0
+                $cleanLog += "Eliminado: $lp"
+            }
+        }
+    } catch {}
+
+    # 4. Limpiar carpeta de registro de instalacion (archivos XML corruptos causan 0-2031)
+    try {
+        $regFolder = "$env:ProgramData\Microsoft\Office\ClickToRun\Registration"
+        if (Test-Path $regFolder) {
+            # Solo eliminar archivos .xml y .dat de registro, no toda la carpeta
+            Get-ChildItem $regFolder -Filter "*.xml" -EA 0 | Remove-Item -Force -EA 0
+            Get-ChildItem $regFolder -Filter "*.dat" -EA 0 | Remove-Item -Force -EA 0
+            $cleanLog += "Archivos de registro C2R limpiados"
+        }
+    } catch {}
+
+    # 5. Limpiar carpeta de descargas parciales de ClickToRun
+    try {
+        $stageFolder = "$env:ProgramData\Microsoft\Office\ClickToRun\Stage"
+        if (Test-Path $stageFolder) {
+            # Eliminar solo contenido, no la carpeta (la nueva instalacion la reutilizara)
+            Get-ChildItem $stageFolder -EA 0 | Remove-Item -Force -Recurse -EA 0
+            $cleanLog += "Stage folder limpiado"
+        }
+    } catch {}
+
+    # 6. Limpiar carpetas temporales de Office (archivos .tmp bloquean la instalacion)
+    try {
+        $tempPaths = @(
+            "$env:TEMP\OfficeSetup",
+            "$env:TEMP\OfficeC2R",
+            "$env:TEMP\ClickToRun",
+            "$env:TEMP\Microsoft Office"
+        )
+        foreach ($tp in $tempPaths) {
+            if (Test-Path $tp) { Remove-Item -Path $tp -Recurse -Force -EA 0 }
+        }
+        # Limpiar archivos sueltos Office*.tmp en TEMP
+        Get-ChildItem $env:TEMP -Filter "Office*.tmp" -EA 0 | Remove-Item -Force -EA 0
+        Get-ChildItem $env:TEMP -Filter "C2R*.tmp" -EA 0 | Remove-Item -Force -EA 0
+        $cleanLog += "Temporales Office limpiados"
+    } catch {}
+
+    # 7. Eliminar entradas de uninstaller colgadas de Office (sin binario real)
+    try {
+        $uninstallPaths = @(
+            "HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\*",
+            "HKLM:\SOFTWARE\WOW6432Node\Microsoft\Windows\CurrentVersion\Uninstall\*"
+        )
+        $uninstallPaths | ForEach-Object {
+            Get-ItemProperty $_ -EA 0 | Where-Object {
+                $_.DisplayName -match "Microsoft Office|Office 365" -and $_.DisplayName -notmatch "Viewer|Update|Proof"
+            } | ForEach-Object {
+                # Verificar si el binario de uninstall realmente existe
+                $uninstallStr = $_.UninstallString
+                $binaryExists = $false
+                if ($uninstallStr) {
+                    if ($uninstallStr -match "^\"?([^\"]+)\"?") {
+                        $binPath = $Matches[1]
+                        if (Test-Path $binPath) { $binaryExists = $true }
+                    }
+                }
+                if (-not $binaryExists) {
+                    try {
+                        Remove-Item -Path $_.PSPath -Recurse -Force -EA 0
+                        $cleanLog += "Entrada colgada eliminada: $($_.DisplayName)"
+                    } catch {}
+                }
+            }
+        }
+    } catch {}
+
+    # 8. Reiniciar el servicio ClickToRun para que cargue config limpia
+    try {
+        $c2rSvc = Get-Service -Name "ClickToRunSvc" -EA 0
+        if ($c2rSvc) {
+            try { Start-Service -Name "ClickToRunSvc" -EA 0 } catch {}
+            $cleanLog += "Servicio ClickToRun reiniciado"
+        }
+    } catch {}
+
+    # 9. Limpiar Windows Update cache (a veces Office instala via WU)
+    try {
+        Stop-Service -Name wuauserv -Force -EA 0
+        $wuCache = "$env:windir\SoftwareDistribution\Download"
+        if (Test-Path $wuCache) {
+            Get-ChildItem $wuCache -EA 0 | Where-Object { $_.Name -match "Office|C2R" } | Remove-Item -Force -Recurse -EA 0
+        }
+        Start-Service -Name wuauserv -EA 0
+    } catch {}
+
+    return $cleanLog
+}
+
 function Find-MAS {
     if ($Global:MAS_File -and (Test-Path $Global:MAS_File) -and (Get-Item $Global:MAS_File).Length -gt 1KB) { return $Global:MAS_File }
     $searchPaths = @()
@@ -224,6 +361,14 @@ function Find-MAS {
     $searchPaths += ".\MAS_AIO.cmd"
     try { $searchPaths += Join-Path ([Environment]::GetFolderPath("Desktop")) "MAS_AIO.cmd" } catch {}
     try { $searchPaths += Join-Path $env:USERPROFILE "Downloads\MAS_AIO.cmd" } catch {}
+    # Buscar tambien en Documentos\SHADOWIEX (auto-descarga de SHADOWIEX)
+    try {
+        $docsPath = [Environment]::GetFolderPath("MyDocuments")
+        if ($docsPath) {
+            $searchPaths += Join-Path $docsPath "SHADOWIEX\MAS_AIO.cmd"
+            $searchPaths += Join-Path $docsPath "MAS_AIO.cmd"
+        }
+    } catch {}
     foreach ($p in $searchPaths) {
         if ($p -and (Test-Path $p) -and (Get-Item $p).Length -gt 1KB) { $Global:MAS_File = $p; return $p }
     }
@@ -1380,6 +1525,23 @@ foreach ($Ver in $OfficeDownloads.Keys) {
             if (-not $plat) { $plat = 'x64' } # fallback defensivo
             $Url = "https://c2rsetup.officeapps.live.com/c2r/download.aspx?ProductreleaseID=$($DL_PID)&platform=$plat&language=es-mx&version=O16GA"
             $DestPath = Join-Path $Global:DownloadPath "$($DL_PID)_$($plat)_es-mx.exe"
+
+            # PRE-LIMPIEZA de Office antes de descargar (evita errores 30183-44 y 0-2031)
+            Update-Status "Pre-limpieza de Office antes de instalar (evita errores 30183-44 y 0-2031)..."
+            Write-Log "Ejecutando Invoke-OfficePreClean para $($DL_PID)"
+            try {
+                $cleanLog = Invoke-OfficePreClean -PidBeingInstalled $DL_PID
+                if ($cleanLog -and $cleanLog.Count -gt 0) {
+                    Write-Log "PreClean: $($cleanLog -join '; ')"
+                    Update-Status "Pre-limpieza completada ($($cleanLog.Count) acciones) - descargando..." "success"
+                } else {
+                    Update-Status "Pre-limpieza: no se requirio - descargando..."
+                }
+            } catch {
+                Write-Log "PreClean falló (continuando): $_"
+                Update-Status "Pre-limpieza omitida - descargando..." "warning"
+            }
+
             Update-Status "Descargando $($DL_Name) ($($plat.ToUpper())) (~7 MB)..."
             Write-Log "Descarga Office: $($DL_Name) ($($DL_PID)) plataforma=$plat"
             try {
@@ -1480,9 +1642,65 @@ $TabAct.Controls.Add($ActScroll)
 $ActScroll.Controls.Add((New-SectionTitle -Text "ACTIVACION DE WINDOWS Y OFFICE" -X 15 -Y 10))
 
 $masStatus = Find-MAS
-$masText = if ($masStatus) { "MAS_AIO.cmd detectado" } else { "MAS no encontrado - se descargara al activar" }
+$masText = if ($masStatus) { "MAS_AIO.cmd detectado" } else { "MAS no encontrado - se descargara automaticamente" }
 $masColor = if ($masStatus) { $Global:Theme.Success } else { $Global:Theme.Warning }
-$ActScroll.Controls.Add((New-DescLabel -Text $masText -X 15 -Y 38 -W 400 -H 18))
+$Global:MasStatusLabel = New-DescLabel -Text $masText -X 15 -Y 38 -W 400 -H 18
+$ActScroll.Controls.Add($Global:MasStatusLabel)
+
+# --- Auto-descarga de MAS al entrar a la pestania ACTIVAR por primera vez ---
+# Evita que los botones de HWID/Ohook/TSforge/KMS fallen por falta de MAS_AIO.cmd
+$Global:MAS_AutoDownloaded = $false
+$TabAct.Add_Enter({
+    # Solo ejecutar una vez por sesion
+    if ($Global:MAS_AutoDownloaded) { return }
+    # Si ya esta encontrado en disco, no descargar
+    if (Find-MAS) {
+        $Global:MAS_AutoDownloaded = $true
+        if ($Global:MasStatusLabel) {
+            $Global:MasStatusLabel.Text = "MAS_AIO.cmd detectado - listo para activar"
+            $Global:MasStatusLabel.ForeColor = $Global:Theme.Success
+        }
+        return
+    }
+    # Descargar MAS en segundo plano a la carpeta Documentos del usuario
+    if ($Global:MasStatusLabel) {
+        $Global:MasStatusLabel.Text = "Descargando MAS_AIO.cmd automaticamente..."
+        $Global:MasStatusLabel.ForeColor = $Global:Theme.Warning
+    }
+    Update-Status "Auto-descargando MAS a Documentos..."
+    try {
+        # Carpeta destino: Documentos\SHADOWIEX
+        $docsPath = [Environment]::GetFolderPath('MyDocuments')
+        $masDestDir = Join-Path $docsPath "SHADOWIEX"
+        if (-not (Test-Path $masDestDir)) { New-Item -ItemType Directory -Path $masDestDir -Force | Out-Null }
+        $masDestFile = Join-Path $masDestDir "MAS_AIO.cmd"
+        # URL actualizada del repositorio massgravel
+        $masUrl = "https://raw.githubusercontent.com/massgravel/Microsoft-Activation-Scripts/master/MAS/All-In-One-Version-KL/MAS_AIO.cmd"
+        Invoke-SafeDownload -Url $masUrl -Destination $masDestFile -MinSizeKB 50 -TimeoutSec 60
+        # Validar contenido
+        $content = Get-Content $masDestFile -Raw -EA 0
+        if (-not $content -or $content -notmatch "MAS AIO") {
+            throw "el archivo descargado no parece ser MAS_AIO.cmd valido"
+        }
+        # Registrar la ubicacion en $Global:MAS_File para que Find-MAS lo encuentre
+        $Global:MAS_File = $masDestFile
+        $Global:MAS_AutoDownloaded = $true
+        if ($Global:MasStatusLabel) {
+            $Global:MasStatusLabel.Text = "MAS_AIO.cmd descargado en Documentos\SHADOWIEX - listo"
+            $Global:MasStatusLabel.ForeColor = $Global:Theme.Success
+        }
+        Update-Status "MAS descargado a Documentos\SHADOWIEX" "success"
+        Write-Log "MAS auto-descargado a $masDestFile"
+    } catch {
+        $Global:MAS_AutoDownloaded = $false
+        if ($Global:MasStatusLabel) {
+            $Global:MasStatusLabel.Text = "No se pudo descargar MAS automaticamente - usar MAS ONLINE (iex)"
+            $Global:MasStatusLabel.ForeColor = $Global:Theme.Danger
+        }
+        Update-Status "Fallo auto-descarga MAS: $_" "warning"
+        Write-Log "Error auto-descarga MAS: $_"
+    }
+}.GetNewClosure())
 
 # Check activation
 $btnCheckAct = New-Btn -Text "VERIFICAR ACTIVACION" -X 15 -Y 60 -W 200 -H 38 -Color "Info"
@@ -1816,7 +2034,7 @@ if (-not $isAdmin) {
 try { Set-ExecutionPolicy -Scope Process Bypass -Force -EA 0 } catch {}
 
 # --- PASO 1: Cerrar procesos de Office AGRESIVAMENTE ---
-Write-Host "[1/9] Cerrando procesos de Office (taskkill /F /T)..." -ForegroundColor Yellow
+Write-Host "[1/10] Cerrando procesos de Office (taskkill /F /T)..." -ForegroundColor Yellow
 $officeProcs = @("WINWORD","EXCEL","OUTLOOK","POWERPNT","MSACCESS","ONENOTE","MSPUB","MSQUERY",
                  "LYNC","SKYPE","TEAMS","CLICKTORUN","OFFICETELEMETRY","MSOSYNC","GROOVE",
                  "ONEDRIVE","WINPROJ","VISIO","BCREDITIALUI","SEARCHPROTOCOLHOST","SEARCHFILTERHOST",
@@ -1847,7 +2065,7 @@ Start-Sleep -Seconds 2
 Write-Host "  Procesos cerrados: $killed" -ForegroundColor Gray
 
 # --- PASO 2: Detener y deshabilitar servicios de Office ---
-Write-Host "[2/9] Deteniendo servicios de Office..." -ForegroundColor Yellow
+Write-Host "[2/10] Deteniendo servicios de Office..." -ForegroundColor Yellow
 $officeSvcs = @("ClickToRunSvc","osppsvc","OfficeSvc","ose64","ose","OfficeTelemetryAgentLogon","OfficeTelemetryAgentSysprep","OfficeSoftwareProtectionPlatform")
 foreach ($svc in $officeSvcs) {
     try {
@@ -1865,7 +2083,7 @@ try { Get-Process | Where-Object { $_.ProcessName -match "ose|osppsvc|OfficeClic
 Start-Sleep -Seconds 1
 
 # --- PASO 3: Desinstalar Office ClickToRun ---
-Write-Host "[3/9] Desinstalando Office ClickToRun..." -ForegroundColor Yellow
+Write-Host "[3/10] Desinstalando Office ClickToRun..." -ForegroundColor Yellow
 $ctrExe = "$env:CommonProgramFiles\Microsoft Shared\ClickToRun\OfficeClickToRun.exe"
 if (Test-Path $ctrExe) {
     Write-Host "  C2R detectado: $ctrExe" -ForegroundColor Gray
@@ -1892,7 +2110,7 @@ if (Test-Path $ctrExe) {
 }
 
 # --- PASO 4: Desinstalar Office MSI (incluyendo ocultos) ---
-Write-Host "[4/9] Buscando instalaciones Office MSI (incluyendo ocultos)..." -ForegroundColor Yellow
+Write-Host "[4/10] Buscando instalaciones Office MSI (incluyendo ocultos)..." -ForegroundColor Yellow
 $uninstallPaths = @(
     "HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\*",
     "HKLM:\SOFTWARE\WOW6432Node\Microsoft\Windows\CurrentVersion\Uninstall\*",
@@ -1936,7 +2154,7 @@ $uninstallPaths | ForEach-Object {
 if ($msiCount -eq 0) { Write-Host "  No se encontraron instalaciones MSI" -ForegroundColor Gray }
 
 # --- PASO 4b: Forzar eliminacion via WMI (catch-all) ---
-Write-Host "[4.5/9] Forzando eliminacion via WMI (Win32_Product)..." -ForegroundColor Yellow
+Write-Host "[4.5/10] Forzando eliminacion via WMI (Win32_Product)..." -ForegroundColor Yellow
 try {
     $wmiOffice = Get-WmiObject -Class Win32_Product -Filter "Name LIKE '%Microsoft Office%' OR Name LIKE '%Office 365%' OR Name LIKE '%Microsoft 365%'" -EA 0
     foreach ($prod in $wmiOffice) {
@@ -1950,7 +2168,7 @@ try {
 } catch { Write-Host "  WMI no disponible o sin productos" -ForegroundColor Gray }
 
 # --- PASO 5: Limpiar tareas programadas y registros de Office ---
-Write-Host "[5/9] Limpiando tareas programadas y registros de Office..." -ForegroundColor Yellow
+Write-Host "[5/10] Limpiando tareas programadas y registros de Office..." -ForegroundColor Yellow
 # 5a. Tareas programadas de Office (lista ampliada)
 $officeTasks = @(
     "\Microsoft\Office\OfficeTelemetryAgentFallBack",
@@ -2015,7 +2233,7 @@ try {
 Write-Host "  Registros limpiados: $regCleaned" -ForegroundColor Gray
 
 # --- PASO 6: Limpiar archivos residuales (TOMAR PROPIEDAD) ---
-Write-Host "[6/9] Eliminando archivos residuales (tomando propiedad)..." -ForegroundColor Yellow
+Write-Host "[6/10] Eliminando archivos residuales (tomando propiedad)..." -ForegroundColor Yellow
 $folders = @(
     "$env:ProgramFiles\Microsoft Office",
     "${env:ProgramFiles(x86)}\Microsoft Office",
@@ -2065,7 +2283,7 @@ $freedMB = [math]::Round($sizeFreed / 1MB, 1)
 Write-Host "  Carpetas eliminadas: $folderCount (~$freedMB MB)" -ForegroundColor Gray
 
 # --- PASO 7: Limpiar cache de Windows Installer de Office ---
-Write-Host "[7/9] Limpiando cache de Windows Installer (MSP/MSI)..." -ForegroundColor Yellow
+Write-Host "[7/10] Limpiando cache de Windows Installer (MSP/MSI)..." -ForegroundColor Yellow
 try {
     $installerCache = "$env:windir\Installer"
     $cacheCleaned = 0
@@ -2094,7 +2312,7 @@ try {
 } catch { Write-Host "  Cache Installer no accesible" -ForegroundColor Gray }
 
 # --- PASO 8: Limpiar registro de COM y ActiveX de Office ---
-Write-Host "[8/9] Limpiando registros COM/ActiveX de Office..." -ForegroundColor Yellow
+Write-Host "[8/10] Limpiando registros COM/ActiveX de Office..." -ForegroundColor Yellow
 $comCleaned = 0
 try {
     # Clases CLSID que contengan Office
@@ -2122,7 +2340,7 @@ Write-Host "  Entradas COM/ActiveX Office eliminadas: $comCleaned" -ForegroundCo
 
 # --- PASO 9: Verificacion final y resumen ---
 Write-Host ""
-Write-Host "[9/9] Verificando limpieza..." -ForegroundColor Yellow
+Write-Host "[9/10] Verificando limpieza..." -ForegroundColor Yellow
 $remainingOffice = Get-ItemProperty "HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\*","HKLM:\SOFTWARE\WOW6432Node\Microsoft\Windows\CurrentVersion\Uninstall\*" -EA 0 | Where-Object { $_.DisplayName -match "Microsoft Office|Office 365|Microsoft 365" }
 if ($remainingOffice) {
     Write-Host "  ADVERTENCIA: Aun quedan entradas de Office en Uninstall:" -ForegroundColor DarkYellow
@@ -2132,6 +2350,106 @@ if ($remainingOffice) {
 } else {
     Write-Host "  OK: No se detectaron instalaciones Office residuales" -ForegroundColor Green
 }
+
+# --- PASO 10: Eliminar accesos directos e iconos de Office ---
+Write-Host ""
+Write-Host "[10/10] Eliminando accesos directos e iconos de Office..." -ForegroundColor Yellow
+$shortcutsRemoved = 0
+$iconLocations = @(
+    # Menu Inicio - todos los usuarios
+    "$env:ProgramData\Microsoft\Windows\Start Menu\Programs",
+    # Menu Inicio - usuario actual
+    "$env:APPDATA\Microsoft\Windows\Start Menu\Programs",
+    # Escritorio - todos los usuarios
+    "$env:PUBLIC\Desktop",
+    # Escritorio - usuario actual
+    "$env:USERPROFILE\Desktop",
+    # Barra de tareas anclada (accesos directos)
+    "$env:APPDATA\Microsoft\Internet Explorer\Quick Launch\User Pinned\TaskBar",
+    # Carpeta de iconos en cache
+    "$env:LOCALAPPDATA\IconCache.db",
+    # Iconos en ProgramData
+    "$env:ProgramData\Microsoft\Windows\Start Menu\Programs\Startup"
+)
+# Nombres de accesos directos de Office a eliminar (con y sin extension)
+$officeShortcutNames = @(
+    "Word","Excel","PowerPoint","Outlook","OneNote","Access","Publisher","Visio",
+    "Project","OneDrive","Skype for Business","Microsoft Teams","Office",
+    "Microsoft Office","Office 365","Microsoft 365","Office Tool","Office Upload Center",
+    "Word.lnk","Excel.lnk","PowerPoint.lnk","Outlook.lnk","OneNote.lnk","Access.lnk",
+    "Publisher.lnk","Visio.lnk","Project.lnk","OneDrive.lnk",
+    "Microsoft Word.lnk","Microsoft Excel.lnk","Microsoft PowerPoint.lnk",
+    "Microsoft Outlook.lnk","Microsoft Access.lnk","Microsoft Publisher.lnk",
+    "Microsoft OneNote.lnk","Microsoft Visio.lnk","Microsoft Project.lnk",
+    "Microsoft Office Tools.lnk","Microsoft Office.lnk","Office 365.lnk","Microsoft 365.lnk",
+    "Office Upload Center.lnk","Skype for Business.lnk","Microsoft Teams.lnk",
+    "Word.url","Excel.url","PowerPoint.url","Outlook.url","OneNote.url"
+)
+foreach ($loc in $iconLocations) {
+    if (Test-Path $loc) {
+        try {
+            # Buscar accesos directos que contengan Office en la ruta o nombre
+            Get-ChildItem $loc -Recurse -Force -EA 0 -Include "*.lnk","*.url" | ForEach-Object {
+                $shortcut = $_
+                $name = $shortcut.Name
+                # Coincidencia por nombre
+                $matchByName = $false
+                foreach ($pattern in $officeShortcutNames) {
+                    if ($name -like "*$pattern*") { $matchByName = $true; break }
+                }
+                # Coincidencia por destino del shortcut (WScript.Shell)
+                $matchByTarget = $false
+                try {
+                    $shell = New-Object -ComObject WScript.Shell
+                    $target = $shell.CreateShortcut($shortcut.FullName).TargetPath
+                    if ($target -and $target -match "Microsoft Office|Office 365|Microsoft 365|ClickToRun|Office16|Office15") {
+                        $matchByTarget = $true
+                    }
+                } catch {}
+                if ($matchByName -or $matchByTarget) {
+                    try {
+                        Remove-Item -Path $shortcut.FullName -Force -EA 0
+                        $shortcutsRemoved++
+                        Write-Host "  Eliminado: $($shortcut.FullName)" -ForegroundColor DarkGray
+                    } catch {}
+                }
+            }
+            # Eliminar carpetas vacias de Office en Menu Inicio
+            Get-ChildItem $loc -Recurse -Directory -EA 0 | Where-Object {
+                $_.Name -match "Microsoft Office|Office 365|Microsoft 365"
+            } | ForEach-Object {
+                try {
+                    # Solo eliminar si esta vacia o solo tiene archivos .lnk de Office ya borrados
+                    $remaining = Get-ChildItem $_.FullName -Recurse -Force -EA 0
+                    if (-not $remaining -or $remaining.Count -eq 0) {
+                        Remove-Item -Path $_.FullName -Recurse -Force -EA 0
+                        $shortcutsRemoved++
+                    }
+                } catch {}
+            }
+        } catch {}
+    }
+}
+# Limpiar iconos en cache de Office (tiles de Windows 10/11)
+try {
+    $tilePath = "$env:LOCALAPPDATA\Microsoft\Windows\Caches"
+    if (Test-Path $tilePath) {
+        Get-ChildItem $tilePath -Recurse -Force -EA 0 | Where-Object {
+            $_.Name -match "Office|Word|Excel|PowerPoint|Outlook"
+        } | ForEach-Object {
+            try { Remove-Item -Path $_.FullName -Force -EA 0; $shortcutsRemoved++ } catch {}
+        }
+    }
+} catch {}
+# Limpiar IconCache.db para forzar reconstruccion de iconos
+try {
+    $iconCache = "$env:LOCALAPPDATA\IconCache.db"
+    if (Test-Path $iconCache) { Remove-Item -Path $iconCache -Force -EA 0 }
+    # Iconos de Explorer
+    $explorerCache = "$env:LOCALAPPDATA\Microsoft\Windows\Explorer\iconcache*"
+    Get-Item $explorerCache -EA 0 | ForEach-Object { try { Remove-Item $_.FullName -Force -EA 0 } catch {} }
+} catch {}
+Write-Host "  Accesos directos/iconos eliminados: $shortcutsRemoved" -ForegroundColor Gray
 
 Write-Host ""
 Write-Host "========================================" -ForegroundColor Cyan
@@ -2144,6 +2462,7 @@ Write-Host "  Tareas Office:        $tasksRemoved" -ForegroundColor White
 Write-Host "  Registros limpiados:  $regCleaned" -ForegroundColor White
 Write-Host "  Carpetas eliminadas:  $folderCount (~$freedMB MB)" -ForegroundColor White
 Write-Host "  Entradas COM:         $comCleaned" -ForegroundColor White
+Write-Host "  Accesos directos:     $shortcutsRemoved" -ForegroundColor White
 Write-Host ""
 Write-Host "  IMPORTANTE: Reinicia el equipo para completar la limpieza." -ForegroundColor Yellow
 Write-Host ""
