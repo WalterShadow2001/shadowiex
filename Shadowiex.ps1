@@ -1994,7 +1994,7 @@ $MASStatusBar.Text = "  MAS: $(if($masFound){'OK'}else{'--'})"; $MASStatusBar.Fo
 $StatusStrip.Items.Add($MASStatusBar)
 
 # Leyenda derecha - Creado por
-$CreditSpring = New-Object System.Windows.Forms.ToolStripSeparator
+$CreditSpring = New-Object System.Windows.Forms.ToolStripStatusLabel
 $CreditSpring.Spring = $true
 $StatusStrip.Items.Add($CreditSpring)
 
@@ -2002,7 +2002,7 @@ $CreditLabel = New-Object System.Windows.Forms.ToolStripStatusLabel
 $CreditLabel.Text = "Creado por Walter D.P.  "
 $CreditLabel.ForeColor = $Global:Theme.Primary
 $CreditLabel.Font = New-Object System.Drawing.Font("Segoe UI", 8, [System.Drawing.FontStyle]::Italic)
-$CreditLabel.Alignment = [System.Drawing.ContentAlignment]::MiddleRight
+$CreditLabel.Alignment = [System.Windows.Forms.ToolStripItemAlignment]::Right
 $StatusStrip.Items.Add($CreditLabel)
 
 $Global:Form.Controls.Add($StatusStrip)
