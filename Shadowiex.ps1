@@ -377,6 +377,8 @@ function Test-ChocoDir { Test-Path 'C:\ProgramData\chocolatey' }
 # Mapa de IDs winget -> nombre de paquete en Chocolatey.
 # Chocolatey usa nombres distintos (normalmente en minusculas, sin el prefijo del publisher),
 # por lo que no podemos reusar el ID de winget directamente al hacer fallback.
+# NOTA: WhatsApp NO existe como paquete oficial en Chocolatey (solo wrappers de terceros),
+# por eso no aparece aqui. Se instala via Microsoft Store con el ID 9NKSQGP7F2NH.
 $Global:ChocoIDMap = @{
     "Google.Chrome"                          = "googlechrome"
     "Mozilla.Firefox"                        = "firefox"
@@ -394,7 +396,6 @@ $Global:ChocoIDMap = @{
     "OBSProject.OBSStudio"                   = "obs-studio"
     "Discord.Discord"                        = "discord"
     "Telegram.TelegramDesktop"               = "telegram"
-    "WhatsApp.WhatsApp"                      = "whatsapp"
     "Zoom.Zoom"                              = "zoom"
     "7zip.7zip"                              = "7zip"
     "RARLab.WinRAR"                          = "winrar"
@@ -409,9 +410,26 @@ $Global:ChocoIDMap = @{
     "Microsoft.DotNet.DesktopRuntime.8"      = "dotnet-8.0-desktopruntime"
 }
 
+# Tercer fallback: si ni winget ni choco funcionan, abrir la pagina oficial de descarga.
+# Para apps que no tienen paquete oficial en ningun gestor (p.ej. WhatsApp en choco).
+$Global:WebFallbackMap = @{
+    "9NKSQGP7F2NH"                           = "https://www.whatsapp.com/download"
+}
+
 function Get-ChocoID($WingetID) {
     if ($Global:ChocoIDMap.ContainsKey($WingetID)) { return $Global:ChocoIDMap[$WingetID] }
     return $null
+}
+
+function Get-WebFallback($AppID) {
+    if ($Global:WebFallbackMap.ContainsKey($AppID)) { return $Global:WebFallbackMap[$AppID] }
+    return $null
+}
+
+# Detecta si un ID corresponde a Microsoft Store (Store IDs son alfanumericos
+# en mayusculas de ~10-14 chars, sin punto). En ese caso winget requiere --source msstore.
+function Test-IsStoreID($AppID) {
+    return ($AppID -match '^[A-Z0-9]{10,}$')
 }
 
 # ============================================================================
@@ -992,7 +1010,7 @@ $SoftwareData = @{
     "COMUNICACION" = @(
         @{ID="Discord.Discord"; Name="Discord"},
         @{ID="Telegram.TelegramDesktop"; Name="Telegram"},
-        @{ID="WhatsApp.WhatsApp"; Name="WhatsApp"},
+        @{ID="9NKSQGP7F2NH"; Name="WhatsApp"},
         @{ID="Zoom.Zoom"; Name="Zoom"}
     )
     "UTILIDADES" = @(
@@ -1227,7 +1245,14 @@ $InstallBtn.Add_Click({
         [System.Windows.Forms.Application]::DoEvents()
         $Installed = $false
         if ($HasWinget) {
-            try { $Proc = Start-Process "winget" -ArgumentList "install","--id",$AppID,"--accept-source-agreements","--accept-package-agreements","-h" -NoNewWindow -PassThru -Wait -EA 0; if ($Proc.ExitCode -eq 0) { $Installed = $true } } catch {}
+            # Si el ID es de Microsoft Store, hay que indicar --source msstore
+            $WingetArgs = @("install","--id",$AppID,"--accept-source-agreements","--accept-package-agreements","-h")
+            if (Test-IsStoreID $AppID) {
+                $WingetArgs += @("--source","msstore")
+                $ProgDetail.Text = "Instalando desde Microsoft Store..."
+                [System.Windows.Forms.Application]::DoEvents()
+            }
+            try { $Proc = Start-Process "winget" -ArgumentList $WingetArgs -NoNewWindow -PassThru -Wait -EA 0; if ($Proc.ExitCode -eq 0) { $Installed = $true } } catch {}
         }
         if (-not $Installed -and $HasChoco) {
             $ChocoID = Get-ChocoID $AppID
@@ -1236,7 +1261,26 @@ $InstallBtn.Add_Click({
                 [System.Windows.Forms.Application]::DoEvents()
                 try { $Proc = Start-Process "choco" -ArgumentList "install",$ChocoID,"-y","--force" -NoNewWindow -PassThru -Wait -EA 0; if ($Proc.ExitCode -eq 0) { $Installed = $true } } catch {}
             } else {
-                Write-Log "No hay mapeo choco para '$AppID' - se omite fallback"
+                Write-Log "No hay mapeo choco para '$AppID' - se omite fallback choco"
+            }
+        }
+        # Tercer fallback: abrir la pagina oficial de descarga en el navegador
+        if (-not $Installed) {
+            $WebURL = Get-WebFallback $AppID
+            if ($WebURL) {
+                $ProgDetail.Text = "Abriendo pagina de descarga oficial..."
+                $ProgDetail.ForeColor = $Global:Theme.Warning
+                [System.Windows.Forms.Application]::DoEvents()
+                try {
+                    Start-Process $WebURL
+                    Write-Log "Abierta pagina de descarga para '$AppName': $WebURL"
+                    $ProgDetail.Text = "Pagina oficial abierta"
+                    # No marcamos como Installed=true porque el usuario debe instalar manualmente,
+                    # pero tampoco lo contamos como fallo completo.
+                    $Fail--   # descontamos el fallo que se va a sumar abajo
+                } catch {
+                    Write-Log "Error abriendo pagina para '$AppName': $_"
+                }
             }
         }
         if ($Installed) {
