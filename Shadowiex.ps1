@@ -1192,7 +1192,7 @@ $InstallBtn.Add_Click({
         if (-not $Installed -and $HasChoco) {
             $ProgDetail.Text = "Intentando via chocolatey..."
             [System.Windows.Forms.Application]::DoEvents()
-            try { $ChocoID = ($AppID -replace '\.','').ToLower(); $Proc = Start-Process "choco" -ArgumentList "install",$ChocoID,"-y","--force" -NoNewWindow -PassThru -Wait -EA 0; if ($Proc.ExitCode -eq 0) { $Installed = $true } } catch {}
+            try { $ChocoID = $AppID; $Proc = Start-Process "choco" -ArgumentList "install",$ChocoID,"-y","--force" -NoNewWindow -PassThru -Wait -EA 0; if ($Proc.ExitCode -eq 0) { $Installed = $true } } catch {}
         }
         if ($Installed) {
             $ProgDetail.Text = "Completado"; $ProgDetail.ForeColor = $Global:Theme.Success; $OK++
