@@ -374,6 +374,46 @@ function Test-Winget { try { $null = winget --version 2>$null; return $true } ca
 function Test-Choco  { try { $null = choco --version 2>$null; return $true } catch { return $false } }
 function Test-ChocoDir { Test-Path 'C:\ProgramData\chocolatey' }
 
+# Mapa de IDs winget -> nombre de paquete en Chocolatey.
+# Chocolatey usa nombres distintos (normalmente en minusculas, sin el prefijo del publisher),
+# por lo que no podemos reusar el ID de winget directamente al hacer fallback.
+$Global:ChocoIDMap = @{
+    "Google.Chrome"                          = "googlechrome"
+    "Mozilla.Firefox"                        = "firefox"
+    "Opera.Opera"                            = "opera"
+    "Microsoft.Edge"                         = "microsoft-edge"
+    "BraveSoftware.BraveBrowser"             = "brave"
+    "Git.Git"                                = "git"
+    "GitHub.GitHubDesktop"                   = "github-desktop"
+    "Microsoft.VisualStudioCode"             = "vscode"
+    "Notepad++.Notepad++"                    = "notepadplusplus"
+    "Python.Python.3.12"                     = "python312"
+    "VideoLAN.VLC"                           = "vlc"
+    "GIMP.GIMP"                              = "gimp"
+    "Spotify.Spotify"                        = "spotify"
+    "OBSProject.OBSStudio"                   = "obs-studio"
+    "Discord.Discord"                        = "discord"
+    "Telegram.TelegramDesktop"               = "telegram"
+    "WhatsApp.WhatsApp"                      = "whatsapp"
+    "Zoom.Zoom"                              = "zoom"
+    "7zip.7zip"                              = "7zip"
+    "RARLab.WinRAR"                          = "winrar"
+    "Microsoft.PowerToys"                    = "powertoys"
+    "voidtools.Everything"                   = "everything"
+    "LibreOffice.LibreOffice"                = "libreoffice-fresh"
+    "PDF24.PDF24Creator"                     = "pdf24"
+    "SumatraPDF.SumatraPDF"                  = "sumatrapdf"
+    "Malwarebytes.Malwarebytes"              = "malwarebytes"
+    "Microsoft.VCRedist.2015+.x64"           = "vcredist140"
+    "Microsoft.VCRedist.2015+.x86"           = "vcredist140"
+    "Microsoft.DotNet.DesktopRuntime.8"      = "dotnet-8.0-desktopruntime"
+}
+
+function Get-ChocoID($WingetID) {
+    if ($Global:ChocoIDMap.ContainsKey($WingetID)) { return $Global:ChocoIDMap[$WingetID] }
+    return $null
+}
+
 # ============================================================================
 #  FORMULARIO PRINCIPAL
 # ============================================================================
@@ -1190,9 +1230,14 @@ $InstallBtn.Add_Click({
             try { $Proc = Start-Process "winget" -ArgumentList "install","--id",$AppID,"--accept-source-agreements","--accept-package-agreements","-h" -NoNewWindow -PassThru -Wait -EA 0; if ($Proc.ExitCode -eq 0) { $Installed = $true } } catch {}
         }
         if (-not $Installed -and $HasChoco) {
-            $ProgDetail.Text = "Intentando via chocolatey..."
-            [System.Windows.Forms.Application]::DoEvents()
-            try { $ChocoID = $AppID; $Proc = Start-Process "choco" -ArgumentList "install",$ChocoID,"-y","--force" -NoNewWindow -PassThru -Wait -EA 0; if ($Proc.ExitCode -eq 0) { $Installed = $true } } catch {}
+            $ChocoID = Get-ChocoID $AppID
+            if ($ChocoID) {
+                $ProgDetail.Text = "Intentando via chocolatey ($ChocoID)..."
+                [System.Windows.Forms.Application]::DoEvents()
+                try { $Proc = Start-Process "choco" -ArgumentList "install",$ChocoID,"-y","--force" -NoNewWindow -PassThru -Wait -EA 0; if ($Proc.ExitCode -eq 0) { $Installed = $true } } catch {}
+            } else {
+                Write-Log "No hay mapeo choco para '$AppID' - se omite fallback"
+            }
         }
         if ($Installed) {
             $ProgDetail.Text = "Completado"; $ProgDetail.ForeColor = $Global:Theme.Success; $OK++
