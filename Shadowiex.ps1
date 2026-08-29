@@ -860,9 +860,9 @@ $RepairTools = @(
         Update-Status "Component Store iniciado" "success"; Write-Log "DISM Component Store"
     }},
     @{Name="FORZAR MENU RESTAURACION"; Desc="Reinicia al menu de restauracion de Windows (WinRE)"; Color="Warning"; Action={
-        $R = [System.Windows.Forms.MessageBox]::Show("Esto reiniciara tu PC al menu de restauracion de Windows (Opciones de inicio avanzadas).\n\nPodras acceder a:\n- Restaurar sistema\n- Reparacion de inicio\n- Imagen de sistema\n- Simbolo del sistema\n- Configuracion UEFI\n\nDeseas continuar?", "SHADOWIEX", 4, [System.Windows.Forms.MessageBoxIcon]::Warning)
+        $R = [System.Windows.Forms.MessageBox]::Show('Esto reiniciara tu PC al menu de restauracion de Windows.' + [Environment]::NewLine + [Environment]::NewLine + 'Podras acceder a:' + [Environment]::NewLine + '- Restaurar sistema' + [Environment]::NewLine + '- Reparacion de inicio' + [Environment]::NewLine + '- Imagen de sistema' + [Environment]::NewLine + '- Simbolo del sistema' + [Environment]::NewLine + '- Configuracion UEFI' + [Environment]::NewLine + [Environment]::NewLine + 'Deseas continuar?', 'SHADOWIEX', 4, [System.Windows.Forms.MessageBoxIcon]::Warning)
         if ($R -eq 6) { Update-Status "Reiniciando al menu de restauracion..."; Write-Log "Forzar menu restauracion"; Start-Process shutdown.exe -ArgumentList '/r /o /f /t 5' -Verb RunAs }
-    }},
+    }}
 )
 
 $RY = 40; $RX = 15; $RCol = 0
